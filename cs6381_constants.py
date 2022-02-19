@@ -1,0 +1,15 @@
+REGISTRY_PORT = 6000
+REGISTRY_PUSH_PORT = 40000
+BROKER_PORT = 6001
+PUBLISHER_PORT = 5555
+SUBSCRIBER_PORT = 5556
+
+REGISTRY = "registry"
+REGISTER = "register"
+DISCOVER = "discover"
+
+PUB = "pub"
+SUB = "sub"
+BROKER = "broker"
+DIRECT = "direct"
+BROKER_IP = "brokerIP"
