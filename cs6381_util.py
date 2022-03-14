@@ -60,25 +60,25 @@ def get_subscribe_message(message, sub_ip, uuid):
     return [topic, value, pub_id, sub_id, sent_time, current_time.strftime('%Y-%m-%d %H:%M:%S.%f')]
 
 
-csv_file = "results/{}-{}-{}.csv"
+csv_file = "results/{}-{}-{}-{}/{}-{}-{}-{}.csv"
 
 
 # get subscriber data from local and write to csv file
-def write_to_csv(num_pubs, num_subs, strategy):
+def write_to_csv(num_pubs, num_subs, strategy, topo):
     sorted_data = sorted(data, key=lambda row: (row[3]), reverse=False)  # sorted by delay time
 
     # dropping highest and lowest delay time
     _, *sorted_data, _ = sorted_data
-
-    if csv_exists(csv_file.format(num_pubs, num_subs, strategy)):
-        append_data_row(csv_file.format(num_pubs, num_subs, strategy), sorted_data)
+    topo = topo if topo is not None else ""
+    if csv_exists(csv_file.format(num_pubs, num_subs, strategy, topo, num_pubs, num_subs, strategy, topo)):
+        append_data_row(csv_file.format(num_pubs, num_subs, strategy, topo, num_pubs, num_subs, strategy, topo), sorted_data)
     else:
-        with open(csv_file.format(num_pubs, num_subs, strategy), "w", encoding="UTF8", newline='') as f:
+        with open(csv_file.format(num_pubs, num_subs, strategy, topo, num_pubs, num_subs, strategy, topo), "w", encoding="UTF8", newline='') as f:
             writer = csv.writer(f)
             writer.writerow(header)
             writer.writerows(sorted_data)
 
-    averages(num_pubs, num_subs, strategy)
+    averages(num_pubs, num_subs, strategy, topo)
 
 
 def append_data_row(file, rows):
@@ -117,10 +117,10 @@ def csv_exists(path):
     return os.path.exists(path)
 
 
-def averages(num_pubs, num_subs, strategy):
-    filepath_averages = "results/averages_{}.csv".format(strategy)
+def averages(num_pubs, num_subs, strategy, topo):
+    filepath_averages = "results/{}-{}-{}-{}/averages_{}_{}.csv".format(num_pubs, num_subs, strategy, topo, strategy, topo)
 
-    csv_data = pd.read_csv(csv_file.format(num_pubs, num_subs, strategy))
+    csv_data = pd.read_csv(csv_file.format(num_pubs, num_subs, strategy, topo, num_pubs, num_subs, strategy, topo))
     print("averaging {} rows".format(len(csv_data)))
 
     average_time_delay = csv_data["time_difference"].mean().round(8)

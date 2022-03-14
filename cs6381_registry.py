@@ -4,7 +4,11 @@ import cs6381_constants as constants
 import time
 import argparse
 import threading
+import logging
 
+from cs6381_registryhelper import RegistryHelper
+from cs6381_util import get_system_address
+from kad_client import KademliaClient
 
 def parseCmdLineArgs():
     # instantiate a ArgumentParser object
@@ -14,244 +18,99 @@ def parseCmdLineArgs():
     parser.add_argument("-p", "--publishers", type=int, default=1, help="number of publishers")
     parser.add_argument("-s", "--subscribers", type=int, default=1, help="number of subscribers")
 
+    parser.add_argument("-c", "--create", default=False, action="store_true",
+                        help="Create a new DHT ring, otherwise we join a DHT")
+    parser.add_argument("-l", "--debug", default=logging.NOTSET, action="store_true",
+                        help="Logging level (see logging package): default WARNING else DEBUG")
+    parser.add_argument("-i", "--ipaddr", type=str, default=None, help="IP address of any existing DHT node")
+    parser.add_argument("-r", "--port", help="port number used by one or more DHT nodes", type=int, default=8468)
+    parser.add_argument("-t", "--topo", help="mininet topology", choices=["linear", "tree"], type=str, default="linear")
+    # parser.add_argument("-o", "--override_port",
+    #                     help="overriden port number used by our node. Used if we want to create many nodes on the same host",
+    #                     type=int, default=None)
+
     return parser.parse_args()
-
-
-class Registry:
-
-    def __init__(self, role, address="localhost", port=None, strategy=None, client=None):
-        self.context = zmq.Context()
-        self.socket = self.context.socket(zmq.REQ)
-        self.socket.setsockopt(zmq.RCVTIMEO, 1000)  # set timeout of 1 second
-
-        self.socket_pull = self.context.socket(zmq.PULL)
-        self.poller = zmq.Poller()
-
-        self.role = role
-        self.address = address
-        self.port = port
-        self.strategy = strategy
-        self.serverIP = "localhost" if self.address == "localhost" else "10.0.0.1"
-        self.client = client
-        self.should_start = True
-        self.connect_server()
-
-        self.num_pubs = None
-        self.num_subs = None
-
-    def kickstart(self):
-        while not self.should_start:
-            pass
-
-    def get_start_status(self):
-        self.socket_pull.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PUSH_PORT))
-        self.poller.register(self.socket_pull, zmq.POLLIN)
-        print("checking start")
-        # polls server to see if ready to start
-        while not self.should_start:
-            event = dict(self.poller.poll(1000))
-            if self.socket_pull in event and event[self.socket_pull] == zmq.POLLIN:
-                message = self.socket_pull.recv_string()
-                # print("message received for start status: %s" % message)
-                if message.startswith("start"):
-                    self.should_start = True
-                    msg, self.num_pubs, self.num_subs = message.split()
-                elif message.startswith("wait"):
-                    msg, remaining_pubs, remaining_subs, remaining_broker = message.split()
-                    print("waiting to start...need {} pubs, {} subs, {} broker".format(remaining_pubs, remaining_subs,
-                                                                                       remaining_broker))
-            # time.sleep(1)
-
-    def connect_server(self):
-        #  connect to Registry Server
-        print("connecting to registry server at {} {}".format(self.serverIP, constants.REGISTRY_PORT))
-        self.socket.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PORT))
-
-        # thread = threading.Thread(target=self.get_start_status)
-        # thread.setDaemon(True)
-        # thread.start()
-
-    def register(self, topics=None):
-        print("in register method for topics: {} ".format(topics))
-        if topics is None:
-            topics = []
-        print("registering {} for {} dissemination strategy".format(self.role, self.strategy))
-
-        if self.client is not None:
-            # register broker
-            if self.role == constants.BROKER:
-                self.register_broker()
-            # register publisher
-            elif self.role == constants.PUB and len(topics) > 0:
-                self.register_publisher(topics)
-            # register subscriber
-            elif self.role == constants.SUB:
-                self.register_subscriber(topics)
-
-    def register_broker(self):
-        print('register {} {} {} {}'.format(self.role, self.address, self.port, None))
-        self.socket.send_string('{} {} {} {}'.format(constants.REGISTER, self.role, self.address, self.port))
-
-        try:
-            message = self.socket.recv_string()
-            if message:
-                print("registry response received for register service: %s" % message)
-                print("registered broker: {}".format(self.client))
-                self.kickstart()
-                self.client.start()
-        except Exception:
-            print("must start Registry first!")
-            raise
-
-    def register_publisher(self, topics):
-
-        # send registration info to registry server
-        print('register {} {} {} {}'.format(self.role, self.address, self.port, topics))
-        self.socket.send_string('{} {} {} {}'.format(constants.REGISTER, self.role, self.address, self.port),
-                                0 | zmq.SNDMORE)
-        self.socket.send_json(json.dumps(topics), 1 | 0)
-
-        # response from registry server
-        message = self.socket.recv_string(0)
-        if message:
-            print("registry response received for register service: %s" % message)
-            if self.strategy == constants.BROKER:
-                if self.socket.getsockopt(zmq.RCVMORE):
-                    print("receiving brokerIP")
-                    broker_ip = self.socket.recv_string(1)
-                    print("broker's ip: %s" % broker_ip)
-                    self.kickstart()
-                    self.client.start(broker_ip)
-                else:
-                    broker_ip = None
-                    print("broker ip not received for broker dissemination strategy!")
-                    while broker_ip is None:
-                        broker_ip = self.get_topic_connection(constants.BROKER_IP)
-                        time.sleep(1)
-                    print("broker's ip: %s" % broker_ip)
-                    self.kickstart()
-                    self.client.start(broker_ip)
-            else:
-                self.kickstart()
-                self.client.start()
-
-            print("registered publisher: {}".format(self.client))
-        else:
-            print("error - publisher not registered!")
-
-    def register_subscriber(self, topics):
-
-        registry = self.get_registry(constants.SUB)
-        print("REGISTRY:")
-        print(registry)
-        if "pubNums" in registry and "subNums" in registry:
-            self.num_pubs = registry["pubNums"]
-            self.num_subs = registry["subNums"]
-        while len(registry) <= 2:
-            registry = self.get_registry(constants.SUB)
-        for topic in topics:
-            if self.strategy == constants.DIRECT:
-                if topic in registry:
-                    for connection in registry[topic]:
-                        print("in registry - subscriber attempting to connect to %s for topic %s" % (connection, topic))
-                        self.client.connect(connection)
-                        self.client.subscribe(topic)
-            elif self.strategy == constants.BROKER:
-                if constants.BROKER_IP in registry:
-                    self.client.connect('tcp://{}:{}'.format(registry[constants.BROKER_IP], self.port))
-                    self.client.subscribe(topic)
-                else:
-                    print("Must start Broker App first!")
-                    broker_ip = None
-                    print("broker ip not received for broker dissemination strategy!")
-                    while broker_ip is None:
-                        broker_ip = self.get_topic_connection(constants.BROKER_IP)
-                    print("broker's ip: %s" % broker_ip)
-                    self.client.connect('tcp://{}:{}'.format(broker_ip, self.port))
-                    self.client.subscribe(topic)
-        self.kickstart()
-        self.client.start(self.num_pubs, self.num_subs, self.strategy)
-
-        print("registered subscriber: {}".format(self.client))
-
-    def get_topic_connection(self, topic):
-        self.socket.send_string('{} {}'.format(constants.DISCOVER, topic))
-        message = self.socket.recv()
-        message_string = message.decode("utf-8")
-        if message and message_string != "null":
-            print("registry response received for get_connection service for %s topic: %s" % (topic, message_string))
-            return json.loads(message)
-
-    def get_registry(self, client):
-        self.socket.send_string('{} {}'.format(constants.REGISTRY, client))
-        message = self.socket.recv()
-        if message:
-            return json.loads(message)
 
 
 class RegistryServer:
 
-    def __init__(self, strategy, pubs, subs):
+    def __init__(self, topo, strategy, pubs=1, subs=1):
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REP)
-        self.socket_push = self.context.socket(zmq.PUSH)
-        self.registry = {}
+        self.socket_start_notification = self.context.socket(zmq.PAIR)
+        self.socket_registry_data = self.context.socket(zmq.PUB)
+        self.ip = get_system_address()
+        self.ipaddr = None
         self.strategy = strategy
         self.broker = 1 if strategy == constants.BROKER else 0
         self.pubs = pubs
         self.subs = subs
         self.wait = True
+        self.kdht = None
 
-    def discover(self, topic):
-        return self.registry.get(topic, None)
+        self.kad_client = None
+        self.helper = None
+        self.nodes = [self.ip]
+
+        self.lock = threading.Condition()
+        self.topo = topo
 
     def should_start(self):
-        pubs = self.pubs
-        subs = self.subs
-        broker = self.broker
-        print("need to register {} pubs, {} subs, {} broker".format(pubs, subs, broker))
-        while True:
-            if self.broker <= 0 and self.pubs <= 0 and self.subs <= 0:
+        pubs = self.helper.get("pubNums")
+        subs = self.helper.get("subNums")
+        broker = self.helper.get("brokerNums")
+
+        while self.wait:
+            print("checking app nums:", pubs, subs, broker)
+            if (broker is not None and broker <= 0) and (pubs is not None and pubs <= 0) and (subs is not None and subs <= 0):
                 self.wait = False
-                self.socket_push.send_string("start {} {}".format(pubs, subs))
+                print("SENDING START SIGNAL!!!!!!!!!!")
+                self.socket_start_notification.send_string("start {} {}".format(pubs, subs))
+                break
             else:
-                self.socket_push.send_string("wait {} {} {}".format(self.pubs, self.subs, self.broker))
-            time.sleep(1)
+                # pass
+                self.socket_start_notification.send_string("wait {} {} {}".format(self.pubs, self.subs, self.broker))
+
+            pubs = self.helper.get("pubNums")
+            subs = self.helper.get("subNums")
+            broker = self.helper.get("brokerNums")
+            time.sleep(3)
 
     def broker_registration(self, address, port):
-        self.registry[constants.BROKER_IP] = address
-        self.registry["brokerPort"] = port
-        # self.broker -= 1
+        self.helper.set_broker_ip(address)
+        self.helper.set_broker_port(port)
         self.socket.send_string("successfully registered broker's address {}!".format(address))
 
     def pub_registration(self, address, port, topics):
         connection = 'tcp://{}:{}'.format(address, port)
-
+        new_topics = json.loads(topics)
         # load topics into registry
-        for topic in json.loads(topics):
+        for topic in new_topics:
             print("inserting pub topic into registry: {}, address: {}".format(topic, connection))
-            if topic in self.registry:
-                if connection not in self.registry[topic]:
-                    self.registry[topic].append(connection)
-            else:
-                self.registry[topic] = [connection]
+            self.helper.set_registry(topic, connection)
 
-        print("REGISTRY: {}".format(self.registry))
-        # self.pubs -= 1
-
-        if constants.BROKER_IP in self.registry and self.strategy == constants.BROKER:
-            broker_ip = self.registry[constants.BROKER_IP]
-            self.socket.send_string("successfully registered pub for {} at {}!".format(topics, connection),
-                                    0 | zmq.SNDMORE)
-            self.socket.send_string(broker_ip, 1 | 0)
+        if self.strategy == constants.BROKER:
+            broker_ip = self.helper.get_broker_ip()
+            if broker_ip:
+                self.socket.send_string("successfully registered pub for {} at {}!".format(topics, connection), 0 | zmq.SNDMORE)
+                self.socket.send_string(broker_ip, 1 | 0)
         else:
-            self.socket.send_string(
-                "successfully registered pub for {} at {}!".format(topics, connection))
+            print("PUB REGISTERED!")
+            self.socket.send_string("successfully registered pub for {} at {}!".format(topics, connection))
+            self.notify_new_pub_connection(new_topics, connection)
+
 
     def start_receiving(self):
-        self.registry["pubNums"] = self.pubs
-        self.registry["subNums"] = self.subs
+        print("start_receiving")
+
+        self.helper.set_registry("nodes", self.ip)
+        self.helper.set_registry_node(self.ip)
+        self.helper.set("pubNums", self.pubs)
+        self.helper.set("subNums", self.subs)
+        self.helper.set("brokerNums", self.broker)
+
         print("registry starting to receive requests")
+
         while True:
             message = self.socket.recv_string(0)
             message = message.split()
@@ -273,47 +132,99 @@ class RegistryServer:
                         print("broker registry request received")
                         self.broker_registration(address, port)
 
+                        # broker_num = self.helper.get("brokerNums")
+                        # if broker_num > 0:
+                        #     print("******* updating broker num")
+                        #     self.helper.set("brokerNums", broker_num - 1)
+
                     if role == constants.PUB:
                         # create pub connection string for topic registration
                         self.pub_registration(address, port, topics)
 
+                        # pub_nums = self.helper.get("pubNums")
+                        # if pub_nums > 0:
+                        #     print("******* updating pub num")
+                        #     self.helper.set("pubNums", pub_nums - 1)
+
                     if role == constants.SUB:
-                        # self.subs -= 1
-                        self.socket.send_string("successfully registered sub!")
+                        # sub_nums = self.helper.get("subNums")
+                        # if sub_nums > 0:
+                        #     print("******* updating sub num")
+                        #     self.helper.set("subNums", sub_nums - 1)
+                        self.socket.send_string("success {} {} {}".format(self.topo, self.pubs, self.subs))
 
                 elif action == constants.DISCOVER:
                     topic = info[0]
                     print('retrieving address for: {}'.format(topic))
                     if topic:
-                        address = self.discover(topic)
+                        address = self.helper.discover(topic)
                         print(address)
                         self.socket.send_string(json.dumps(address))
 
                 elif action == constants.REGISTRY:
-                    # if info[0] == "sub":
-                        # self.subs -= 1
-                    self.socket.send_string(json.dumps(self.registry))
-                    print("registry sent")
+                    registry = self.helper.get_registry()
+                    # registry = self.kad_client.get("registry")
+                    print("GOT!:", registry)
+                    if registry:
+                        self.socket.send_string(json.dumps(registry))
+                        print("registry sent")
+                elif action == constants.REGISTRY_NODES:
+                    nodes = self.helper.get_registry_nodes()
+                    self.socket.send_string(json.dumps(nodes))
 
-    def start(self):
-        print("starting registry server on port: {}".format(constants.REGISTRY_PORT))
+    def notify_new_pub_connection(self, topics, connection):
+        self.lock.acquire()
+        try:
+            self.lock.notify()
+            for topic in topics:
+                topic_connection = "%s %s" % (topic, connection)
+                is_new_topic = self.helper.set_topic_index(topic_connection)
+                if is_new_topic:
+                    print("NOTIFYING SUBSCRIBERS OF NEW PUB FOR TOPIC: {} on registry node {}".format(topic_connection, self.ip))
+                    self.socket_registry_data.send_string(topic_connection)
+        finally:
+            self.lock.release()
 
-        self.socket.bind('tcp://*:{}'.format(constants.REGISTRY_PORT))
-        self.socket_push.bind('tcp://*:{}'.format(constants.REGISTRY_PUSH_PORT))
+    def start_send_registry_data(self):
+        self.socket_registry_data.bind('tcp://*:{}'.format(constants.REGISTRY_PUB_PORT_NUMBER))
+        while True:
+            nodes = self.helper.get_registry_nodes()
+            if nodes is not None:
+                for node in nodes:
+                    if not(node in self.nodes):
+                        self.socket_registry_data.send_string("{} {}".format(constants.REGISTRY_NODES, nodes))
+                        self.nodes.append(node)
+            time.sleep(2)
 
-        # thread_kickstart = threading.Thread(target=self.should_start)
-        # thread_kickstart.setDaemon(True)
-        # thread_kickstart.start()
+    def start(self, args):
+        print("starting registry server on port: {}".format(constants.REGISTRY_PORT_NUMBER))
+        print("args", args)
 
-        thread_req = threading.Thread(target=self.start_receiving())
-        thread_req.setDaemon(True)
-        thread_req.start()
+        self.socket.bind('tcp://*:{}'.format(constants.REGISTRY_PORT_NUMBER))
+        self.socket_start_notification.bind('tcp://*:{}'.format(constants.REGISTRY_PUSH_PORT_NUMBER))
+
+        registry_thread = threading.Thread(target=self.start_receiving)
+        registry_thread.setDaemon(True)
+
+        registry_pub_thread = threading.Thread(target=self.start_send_registry_data)
+        registry_pub_thread.setDaemon(True)
+
+        self.ipaddr = args.ipaddr if (args.ipaddr is not None and not args.create) else self.ip
+        self.kad_client = KademliaClient(args.create, args.port, [(self.ipaddr, args.port)])
+        self.helper = RegistryHelper(self.kad_client)
+
+        registry_thread.start()
+        registry_pub_thread.start()
+
+        # should_start_thread = threading.Thread(target=self.should_start)
+        # should_start_thread.setDaemon(True)
+        # should_start_thread.start()
 
 
 def main():
     args = parseCmdLineArgs()
-    registry = RegistryServer(args.disseminate, args.publishers, args.subscribers)
-    registry.start()
+    registry = RegistryServer(args.topo, args.disseminate, args.publishers, args.subscribers)
+    registry.start(args)
 
 
 if __name__ == "__main__":

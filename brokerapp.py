@@ -25,23 +25,24 @@
 # accepting events and handling them at the middleware layer
 #
 import argparse
-from cs6381_registry import Registry
+from cs6381_registryclient import Registry
 from cs6381_configurator import Configurator
 from cs6381_util import get_system_address
 import cs6381_constants as ports
-
+import asyncio
 
 def parseCmdLineArgs():
     # instantiate a ArgumentParser object
     parser = argparse.ArgumentParser(description="Broker Application")
     parser.add_argument("-d", "--disseminate", choices=["direct", "broker"], default="broker", help="Dissemination strategy: direct or via broker; default is direct")
     # parser.add_argument("-a", "--ipaddr", type=str, default='localhost', help="address")
-    parser.add_argument("-p", "--port", type=int, default=ports.BROKER_PORT, help="port number")
+    parser.add_argument("-p", "--port", type=int, default=ports.BROKER_PORT_NUMBER, help="port number")
+    parser.add_argument("-i", "--registryIP", type=str, help="IP address of any existing Registry node")
 
     return parser.parse_args()
 
 
-def main():
+async def main():
     args = parseCmdLineArgs()
     print('command line arguments: ', args)
     ip = get_system_address()
@@ -50,9 +51,9 @@ def main():
 
     broker = config.get_broker()
 
-    registry = Registry("broker", ip, args.port, args.disseminate, broker)
+    registry = Registry("broker", ip, args.port, args.disseminate, broker, args.registryIP)
     registry.register()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

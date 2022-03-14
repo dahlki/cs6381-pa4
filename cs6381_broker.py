@@ -16,12 +16,12 @@
 
 import zmq
 from abc import abstractmethod
-from cs6381_registry import Registry
 import cs6381_constants as ports
+
 
 class Broker(object):
 
-    def __init__(self,  strategy="direct", address='localhost', port=ports.BROKER_PORT):
+    def __init__(self, strategy="direct", address='localhost', port=ports.BROKER_PORT_NUMBER):
         self.context = zmq.Context()
         self.strategy = strategy
         self.address = address
@@ -39,12 +39,12 @@ class Broker(object):
 
 class ViaBroker(Broker):
 
-    def __init__(self, strategy='direct', address='localhost', port=ports.BROKER_PORT):
+    def __init__(self, strategy='direct', address='localhost', port=ports.BROKER_PORT_NUMBER):
         super().__init__(strategy, address, port)
         self.context = zmq.Context()
         self.poller = zmq.Poller()
-        self.pub_port = ports.PUBLISHER_PORT
-        self.sub_port = ports.SUBSCRIBER_PORT
+        self.pub_port = ports.PUBLISHER_PORT_NUMBER
+        self.sub_port = ports.SUBSCRIBER_PORT_NUMBER
         self.xpub = self.context.socket(zmq.XPUB)
         self.xsub = self.context.socket(zmq.XSUB)
 

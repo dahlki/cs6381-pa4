@@ -28,7 +28,7 @@ class Subscriber(object):
         self.port = port
         self.strategy = strategy
         self.uuid = cs6381_util.create_uuid()
-        self.iterations = 500
+        self.iterations = 100
         self.topics = {}
         self.cb = None
         self.messages = {}
@@ -49,7 +49,7 @@ class Subscriber(object):
     # where we want all publishers and subscribers deployed
     # before the publishers can start publishing.
     @abstractmethod
-    def start(self, num_pubs, num_subs, strategy):
+    def start(self, num_pubs, num_subs, strategy, topo):
         pass
 
     def notify(self, topics, cb):
@@ -75,7 +75,7 @@ class DirectSubscriber(Subscriber):
         print("DirectSubscriber subscribing to topic: ", topic)
         self.socket.setsockopt_string(zmq.SUBSCRIBE, topic)
 
-    def start(self, num_pubs, num_subs, strategy):
+    def start(self, num_pubs, num_subs, strategy, topo):
         print("subscriber starting event loop")
         self.poller.register(self.socket, zmq.POLLIN)
         while self.iterations > -1:
@@ -87,7 +87,7 @@ class DirectSubscriber(Subscriber):
                 if topic in self.topics:
                     self.cb(data)
                 self.iterations -= 1
-        cs6381_util.write_to_csv(num_pubs, num_subs, strategy)
+        cs6381_util.write_to_csv(num_pubs, num_subs, strategy, topo)
 
 
 class ViaBrokerSubscriber(Subscriber):
@@ -107,7 +107,7 @@ class ViaBrokerSubscriber(Subscriber):
         print("ViaBrokerSubscriber subscribing to topic: ", topic)
         self.socket.setsockopt_string(zmq.SUBSCRIBE, topic)
 
-    def start(self, num_pubs, num_subs, strategy):
+    def start(self, num_pubs, num_subs, strategy,topo):
         print("subscriber starting event loop")
         # cs6381_util.get_output()
         self.poller.register(self.socket, zmq.POLLIN)
@@ -122,4 +122,4 @@ class ViaBrokerSubscriber(Subscriber):
                 if topic in self.topics:
                     self.cb(data)
                 self.iterations -= 1
-        cs6381_util.write_to_csv(num_pubs, num_subs, strategy)
+        cs6381_util.write_to_csv(num_pubs, num_subs, strategy, topo)

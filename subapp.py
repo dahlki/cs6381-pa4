@@ -49,9 +49,9 @@
 import argparse   # for argument parsing
 from cs6381_configurator import Configurator
 from cs6381_util import get_system_address
-from cs6381_registry import Registry
+from cs6381_registryclient import Registry
 import cs6381_constants as constants
-
+import asyncio
 
 def parseCmdLineArgs ():
     # instantiate a ArgumentParser object
@@ -68,14 +68,15 @@ def parseCmdLineArgs ():
     # options for all the things you need.
     # parser.add_argument("-a", "--ipaddr", default="localhost", help="IP address of the message passing server, default: localhost")
     parser.add_argument ("-d", "--disseminate", choices=["direct", "broker"], default="direct", help="Dissemination strategy: direct or via broker; default is direct")
-    parser.add_argument ("-p", "--port", type=int, default=constants.SUBSCRIBER_PORT, help="specify port number; default is 5556")
+    parser.add_argument ("-p", "--port", type=int, default=constants.SUBSCRIBER_PORT_NUMBER, help="specify port number; default is 5556")
     parser.add_argument("-n", "--number", type=int, choices=range(1, 9), default=None,
                         help="number of topics to publish; between 1 and 8")
+    parser.add_argument("-i", "--registryIP", type=str, help="IP address of any existing Registry node")
 
     return parser.parse_args()
 
 
-def main():
+async def main():
     print("Main: parse command line arguments")
     args = parseCmdLineArgs()
     print(args)
@@ -90,11 +91,11 @@ def main():
 
     sub = config.get_subscriber()
     print("created SUBSCRIBER: ", sub)
-    sub.notify(my_topics, lambda x: print("app notify - {}".format(x)))
+    sub.notify(my_topics, lambda x: print("app notify - {} \n".format(x)))
 
-    registry = Registry(constants.SUB, ip, args.port, args.disseminate, sub)
+    registry = Registry(constants.SUB, ip, args.port, args.disseminate, sub, args.registryIP)
     registry.register(my_topics)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

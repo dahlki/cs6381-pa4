@@ -52,12 +52,12 @@
 import argparse  # for argument parsing
 
 from cs6381_configurator import Configurator  # factory class
-from cs6381_registry import Registry
+from cs6381_registryclient import Registry
 from cs6381_util import get_system_address
 from cs6381_util import get_timestamp
 import cs6381_constants as constants
 import time
-
+import asyncio
 
 # import any other packages you need.
 
@@ -83,12 +83,13 @@ def parseCmdLineArgs():
     parser.add_argument("-d", "--disseminate", choices=["direct", "broker"], default="direct",
                         help="Dissemination strategy: direct or via broker; default is direct")
     # parser.add_argument("-a", "--ipaddr", type=str, default='localhost', help="address")
-    parser.add_argument("-p", "--port", type=int, default=constants.PUBLISHER_PORT,
+    parser.add_argument("-p", "--port", type=int, default=constants.PUBLISHER_PORT_NUMBER,
                         help="specify port number; default is 5555")
     parser.add_argument("-n", "--number", type=int, choices=range(1, 9), default=None,
                         help="number of topics to publish; between 1 and 8; default will be random number of topics")
     parser.add_argument("-t", "--time", type=int, choices=range(0, 4), default=0,
                         help="specify seconds between publishing messages; default is 0")
+    parser.add_argument("-i", "--registryIP", type=str, help="IP address of any existing Registry node")
 
 
     return parser.parse_args()
@@ -103,7 +104,7 @@ def parseCmdLineArgs():
 # Main program
 #
 ###################################
-def main():
+async def main():
     # first parse the arguments
     print("Main: parse command line arguments")
     args = parseCmdLineArgs()
@@ -124,7 +125,7 @@ def main():
     print("created PUBLISHER: ", pub)
 
     # get a handle to our broker object (will be a proxy)
-    registry = Registry(constants.PUB, ip, args.port, args.disseminate, pub)
+    registry = Registry(constants.PUB, ip, args.port, args.disseminate, pub, args.registryIP)
     registry.register(my_topics)
     # wait for kickstart event from broker
     # now do the publication for as many iterations that we plan to do
@@ -142,4 +143,4 @@ def main():
 #
 ###################################
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
