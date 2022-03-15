@@ -46,7 +46,6 @@ class RegistryServer:
         self.pubs = pubs
         self.subs = subs
         self.wait = True
-        self.kdht = None
 
         self.kad_client = None
         self.helper = None
@@ -55,26 +54,22 @@ class RegistryServer:
         self.lock = threading.Condition()
         self.topo = topo
 
-    def should_start(self):
+    def check_start(self):
         pubs = self.helper.get("pubNums")
         subs = self.helper.get("subNums")
         broker = self.helper.get("brokerNums")
 
-        while self.wait:
-            print("checking app nums:", pubs, subs, broker)
-            if (broker is not None and broker <= 0) and (pubs is not None and pubs <= 0) and (subs is not None and subs <= 0):
-                self.wait = False
-                print("SENDING START SIGNAL!!!!!!!!!!")
-                self.socket_start_notification.send_string("start {} {}".format(pubs, subs))
-                break
-            else:
-                # pass
-                self.socket_start_notification.send_string("wait {} {} {}".format(self.pubs, self.subs, self.broker))
+        if (broker is not None and broker <= 0) and (pubs is not None and pubs <= 0) and (subs is not None and subs <= 0):
+            self.helper.set("start", True)
+            return True
+        return False
 
-            pubs = self.helper.get("pubNums")
-            subs = self.helper.get("subNums")
-            broker = self.helper.get("brokerNums")
-            time.sleep(3)
+    def should_start(self):
+        self.socket_start_notification.bind('tcp://*:{}'.format(constants.REGISTRY_PUSH_PORT_NUMBER))
+        while not(self.check_start()):
+            pass
+        print("SENDING START SIGNAL!!!!!!!!!!")
+        self.socket_start_notification.send_string("start")
 
     def broker_registration(self, address, port):
         self.helper.set_broker_ip(address)
@@ -92,15 +87,19 @@ class RegistryServer:
         if self.strategy == constants.BROKER:
             broker_ip = self.helper.get_broker_ip()
             if broker_ip:
-                self.socket.send_string("successfully registered pub for {} at {}!".format(topics, connection), 0 | zmq.SNDMORE)
+                self.socket.send_string("successfully registered pub for {} at {}!".format(topics, connection),
+                                        0 | zmq.SNDMORE)
                 self.socket.send_string(broker_ip, 1 | 0)
+            else:
+                self.socket.send_string("successfully registered pub for {} at {}!".format(topics, connection))
+
         else:
-            print("PUB REGISTERED!")
             self.socket.send_string("successfully registered pub for {} at {}!".format(topics, connection))
             self.notify_new_pub_connection(new_topics, connection)
 
-
     def start_receiving(self):
+        self.socket.bind('tcp://*:{}'.format(constants.REGISTRY_PORT_NUMBER))
+
         print("start_receiving")
 
         self.helper.set_registry("nodes", self.ip)
@@ -138,19 +137,18 @@ class RegistryServer:
                         #     self.helper.set("brokerNums", broker_num - 1)
 
                     if role == constants.PUB:
+                        pub_nums = self.helper.get("pubNums")
+                        if pub_nums > 0:
+                            print("******* updating pub num")
+                            self.helper.set("pubNums", pub_nums - 1)
                         # create pub connection string for topic registration
                         self.pub_registration(address, port, topics)
 
-                        # pub_nums = self.helper.get("pubNums")
-                        # if pub_nums > 0:
-                        #     print("******* updating pub num")
-                        #     self.helper.set("pubNums", pub_nums - 1)
-
                     if role == constants.SUB:
-                        # sub_nums = self.helper.get("subNums")
-                        # if sub_nums > 0:
-                        #     print("******* updating sub num")
-                        #     self.helper.set("subNums", sub_nums - 1)
+                        sub_nums = self.helper.get("subNums")
+                        if sub_nums > 0:
+                            print("******* updating sub num")
+                            self.helper.set("subNums", sub_nums - 1)
                         self.socket.send_string("success {} {} {}".format(self.topo, self.pubs, self.subs))
 
                 elif action == constants.DISCOVER:
@@ -185,7 +183,7 @@ class RegistryServer:
         finally:
             self.lock.release()
 
-    def start_send_registry_data(self):
+    def start_registry_data(self):
         self.socket_registry_data.bind('tcp://*:{}'.format(constants.REGISTRY_PUB_PORT_NUMBER))
         while True:
             nodes = self.helper.get_registry_nodes()
@@ -200,13 +198,12 @@ class RegistryServer:
         print("starting registry server on port: {}".format(constants.REGISTRY_PORT_NUMBER))
         print("args", args)
 
-        self.socket.bind('tcp://*:{}'.format(constants.REGISTRY_PORT_NUMBER))
-        self.socket_start_notification.bind('tcp://*:{}'.format(constants.REGISTRY_PUSH_PORT_NUMBER))
+        # self.socket.bind('tcp://*:{}'.format(constants.REGISTRY_PORT_NUMBER))
 
         registry_thread = threading.Thread(target=self.start_receiving)
         registry_thread.setDaemon(True)
 
-        registry_pub_thread = threading.Thread(target=self.start_send_registry_data)
+        registry_pub_thread = threading.Thread(target=self.start_registry_data)
         registry_pub_thread.setDaemon(True)
 
         self.ipaddr = args.ipaddr if (args.ipaddr is not None and not args.create) else self.ip

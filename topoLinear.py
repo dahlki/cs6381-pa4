@@ -58,7 +58,7 @@ def start_linear_topology(host_num=1, switches=10, strategy="direct", num_pubs=1
     if strategy == "broker":
         def broker_startup():
             broker_host = hosts.pop()
-            brokerapp_cmd = "python3 -u brokerapp.py &> 'results/broker-{}.log' &".format(broker_host.name)
+            brokerapp_cmd = "python3 -u brokerapp.py -i {} &> 'results/broker-{}.log' &".format("10.0.0.1", broker_host.name)
             broker_host.cmd(brokerapp_cmd)
         broker_startup()
 

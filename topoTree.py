@@ -57,7 +57,7 @@ def start_tree_topology(depth=3, fanout=3, strategy="direct", num_pubs=1, num_su
     if strategy == "broker":
         def broker_startup():
             broker_host = hosts.pop()
-            brokerapp_cmd = "python3 -u brokerapp.py &> 'results/broker-{}.log' &".format(broker_host.name)
+            brokerapp_cmd = "python3 -u brokerapp.py -i {} &> 'results/broker-{}.log' &".format("10.0.0.1", broker_host.name)
             broker_host.cmd(brokerapp_cmd)
         broker_startup()
 

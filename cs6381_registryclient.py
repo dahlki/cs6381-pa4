@@ -32,11 +32,6 @@ class Registry:
         self.registry_ips = []
         self.lock = threading.Lock()
 
-    def kickstart(self):
-        while not self.should_start:
-            time.sleep(3)
-            pass
-
     def get_new_registry_data(self, topics):
         registry_info = [constants.REGISTRY_NODES, "pubNums", "subNums", constants.BROKER_IP, "silvia"]
         if topics is not None:
@@ -71,8 +66,9 @@ class Registry:
                         self.client.subscribe(topic)
 
     def get_start_status(self):
-        self.socket_should_start.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PUSH_PORT_NUMBER))
-        self.poller.register(self.socket_should_start, zmq.POLLIN)
+        # self.socket_should_start.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PUSH_PORT_NUMBER))
+        # self.poller.register(self.socket_should_start, zmq.POLLIN)
+
         print("checking start")
         # polls server to see if ready to start
         while not self.should_start:
@@ -82,13 +78,7 @@ class Registry:
                 print("message received for start status: %s" % message)
                 if message.startswith("start"):
                     self.should_start = True
-                    msg, self.num_pubs, self.num_subs = message.split()
-                    print("START!!!", msg)
-                elif message.startswith("wait"):
-                    msg, remaining_pubs, remaining_subs, remaining_broker = message.split()
-                    print("waiting to start...need {} pubs, {} subs, {} broker".format(remaining_pubs, remaining_subs,
-                                                                                       remaining_broker))
-            time.sleep(3)
+                    print("START!!!", message)
 
     def connect_registry(self):
         #  connect to Registry Server
@@ -97,13 +87,15 @@ class Registry:
 
     def connect_server(self):
         #  connect to Registry Server
-        print("connecting to registry server at {} {}".format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
-        self.socket.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
+        # print("connecting to registry server at {} {}".format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
+        # self.socket.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
 
-        # print("thread connect_registry")
-        # thread_registry = threading.Thread(target=self.connect_registry)
-        # thread_registry.setDaemon(True)
-        # thread_registry.start()
+        # self.socket_should_start.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PUSH_PORT_NUMBER))
+        # self.poller.register(self.socket_should_start, zmq.POLLIN)
+
+        thread_registry = threading.Thread(target=self.connect_registry)
+        thread_registry.setDaemon(True)
+        thread_registry.start()
 
         # thread_should_start = threading.Thread(target=self.get_start_status)
         # thread_should_start.setDaemon(True)
@@ -135,7 +127,6 @@ class Registry:
             if message:
                 print("registry response received for register service: %s" % message)
                 print("registered broker: {}".format(self.client))
-                # self.kickstart()
                 self.client.start()
         except Exception:
             print("must start Registry first!")
@@ -157,8 +148,6 @@ class Registry:
                     print("receiving brokerIP")
                     broker_ip = self.socket.recv_string(1)
                     print("broker's ip: %s" % broker_ip)
-                    # self.kickstart()
-                    # self.client.start(broker_ip)
                 else:
                     broker_ip = None
                     print("broker ip not received for broker dissemination strategy!")
@@ -166,11 +155,8 @@ class Registry:
                         broker_ip = self.get_topic_connection(constants.BROKER_IP)
                         time.sleep(1)
                     print("broker's ip: %s" % broker_ip)
-                    # self.kickstart()
                 self.client.start(broker_ip)
             else:
-                # self.kickstart()
-                # self.get_start_status()
                 self.client.start()
 
             print("registered publisher: {}".format(self.client))
@@ -192,6 +178,7 @@ class Registry:
             self.num_subs = subs
 
         if message:
+            print(message)
             while registry is None or len(registry) <= 1:
                 if registry is not None and registry["nodes"]:
                     self.registry_ips = registry["nodes"]
@@ -221,8 +208,8 @@ class Registry:
                 self.client.connect('tcp://{}:{}'.format(broker_ip, self.port))
                 self.client.subscribe(topic)
 
-        # self.kickstart()
-        # self.get_start_status()
+        # while not self.should_start:
+        #     pass
         self.client.start(self.num_pubs, self.num_subs, self.strategy, self.topo)
 
         print("registered subscriber: {}".format(self.client))

@@ -73,6 +73,7 @@ def write_to_csv(num_pubs, num_subs, strategy, topo):
     if csv_exists(csv_file.format(num_pubs, num_subs, strategy, topo, num_pubs, num_subs, strategy, topo)):
         append_data_row(csv_file.format(num_pubs, num_subs, strategy, topo, num_pubs, num_subs, strategy, topo), sorted_data)
     else:
+        os.makedirs("results/{}-{}-{}-{}".format(num_pubs, num_subs, strategy, topo), exist_ok=True)
         with open(csv_file.format(num_pubs, num_subs, strategy, topo, num_pubs, num_subs, strategy, topo), "w", encoding="UTF8", newline='') as f:
             writer = csv.writer(f)
             writer.writerow(header)
