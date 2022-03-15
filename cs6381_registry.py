@@ -25,9 +25,6 @@ def parseCmdLineArgs():
     parser.add_argument("-i", "--ipaddr", type=str, default=None, help="IP address of any existing DHT node")
     parser.add_argument("-r", "--port", help="port number used by one or more DHT nodes", type=int, default=8468)
     parser.add_argument("-t", "--topo", help="mininet topology", choices=["linear", "tree"], type=str, default="linear")
-    # parser.add_argument("-o", "--override_port",
-    #                     help="overriden port number used by our node. Used if we want to create many nodes on the same host",
-    #                     type=int, default=None)
 
     return parser.parse_args()
 
@@ -55,9 +52,9 @@ class RegistryServer:
         self.topo = topo
 
     def check_start(self):
-        pubs = self.helper.get("pubNums")
-        subs = self.helper.get("subNums")
-        broker = self.helper.get("brokerNums")
+        pubs = self.helper.get(constants.PUB_COUNT)
+        subs = self.helper.get(constants.SUB_COUNT)
+        broker = self.helper.get(constants.BROKER_COUNT)
 
         if (broker is not None and broker <= 0) and (pubs is not None and pubs <= 0) and (subs is not None and subs <= 0):
             self.helper.set("start", True)
@@ -78,9 +75,9 @@ class RegistryServer:
 
     def pub_registration(self, address, port, topics):
         connection = 'tcp://{}:{}'.format(address, port)
-        new_topics = json.loads(topics)
+        topics_to_register = json.loads(topics)
         # load topics into registry
-        for topic in new_topics:
+        for topic in topics_to_register:
             print("inserting pub topic into registry: {}, address: {}".format(topic, connection))
             self.helper.set_registry(topic, connection)
 
@@ -95,7 +92,7 @@ class RegistryServer:
 
         else:
             self.socket.send_string("successfully registered pub for {} at {}!".format(topics, connection))
-            self.notify_new_pub_connection(new_topics, connection)
+            self.notify_new_pub_connection(topics_to_register, connection)
 
     def start_receiving(self):
         self.socket.bind('tcp://*:{}'.format(constants.REGISTRY_PORT_NUMBER))
@@ -104,9 +101,9 @@ class RegistryServer:
 
         self.helper.set_registry("nodes", self.ip)
         self.helper.set_registry_node(self.ip)
-        self.helper.set("pubNums", self.pubs)
-        self.helper.set("subNums", self.subs)
-        self.helper.set("brokerNums", self.broker)
+        self.helper.set(constants.PUB_COUNT, self.pubs)
+        self.helper.set(constants.SUB_COUNT, self.subs)
+        self.helper.set(constants.BROKER_COUNT, self.broker)
 
         print("registry starting to receive requests")
 
@@ -131,24 +128,26 @@ class RegistryServer:
                         print("broker registry request received")
                         self.broker_registration(address, port)
 
-                        # broker_num = self.helper.get("brokerNums")
-                        # if broker_num > 0:
-                        #     print("******* updating broker num")
-                        #     self.helper.set("brokerNums", broker_num - 1)
+                        broker_num = self.helper.get(constants.BROKER_COUNT)
+                        if broker_num > 0:
+                            print("******* updating broker num")
+                            self.helper.set(constants.BROKER_COUNT, broker_num - 1)
 
                     if role == constants.PUB:
-                        pub_nums = self.helper.get("pubNums")
-                        if pub_nums > 0:
-                            print("******* updating pub num")
-                            self.helper.set("pubNums", pub_nums - 1)
                         # create pub connection string for topic registration
                         self.pub_registration(address, port, topics)
 
+                        pub_nums = self.helper.get(constants.PUB_COUNT)
+                        if pub_nums > 0:
+                            print("******* updating pub num")
+                            self.helper.set(constants.PUB_COUNT, pub_nums - 1)
+                        self.socket_registry_data.send_string(constants.PUB_COUNT, pub_nums)
+
                     if role == constants.SUB:
-                        sub_nums = self.helper.get("subNums")
+                        sub_nums = self.helper.get(constants.SUB_COUNT)
                         if sub_nums > 0:
                             print("******* updating sub num")
-                            self.helper.set("subNums", sub_nums - 1)
+                            self.helper.set(constants.SUB_COUNT, sub_nums - 1)
                         self.socket.send_string("success {} {} {}".format(self.topo, self.pubs, self.subs))
 
                 elif action == constants.DISCOVER:

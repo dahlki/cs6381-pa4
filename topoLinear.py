@@ -37,10 +37,9 @@ def start_linear_topology(host_num=1, switches=10, strategy="direct", num_pubs=1
 
     cleanup()
     net = Mininet(LinearTopo(k=switches, n=host_num))
-    # net = Mininet(topo=tree)
     net.start()
 
-    # print(net.hosts)
+    print(net.hosts)
 
     for host in net.hosts[1:]:
         hosts.append(host)

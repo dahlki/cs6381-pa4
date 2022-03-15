@@ -33,7 +33,7 @@ class Registry:
         self.lock = threading.Lock()
 
     def get_new_registry_data(self, topics):
-        registry_info = [constants.REGISTRY_NODES, "pubNums", "subNums", constants.BROKER_IP, "silvia"]
+        registry_info = [constants.REGISTRY_NODES, constants.PUB_COUNT, constants.SUB_COUNT, constants.BROKER_IP]
         if topics is not None:
             registry_info.extend(topics)
 
@@ -41,6 +41,7 @@ class Registry:
         self.registry_ips.append(self.serverIP)
 
         for meta_data in registry_info:
+            print("subscribing to: {}".format(meta_data))
             self.socket_registry_data.setsockopt_string(zmq.SUBSCRIBE, meta_data)
 
         self.poller.register(self.socket_registry_data, zmq.POLLIN)

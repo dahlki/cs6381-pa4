@@ -16,3 +16,7 @@ DIRECT = "direct"
 BROKER_IP = "brokerIP"
 BROKER_PORT = "brokerPort"
 REGISTRY_NODES = "registryNodes"
+
+PUB_COUNT = "pubCount"
+SUB_COUNT = "subCount"
+BROKER_COUNT = "brokerCount"

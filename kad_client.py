@@ -5,22 +5,7 @@ import logging
 
 
 class KademliaClient:
-    # Initialize with an integer port and a list of
-    # string,int pairs indicating the hosts to bootstrap against.
-    # for example:
-    # kad_client = KademliaClient(4321, [("10.0.0.1",4001), ("10.0.0.2",4001), ("10.0.0.2", 4002)]
-    #
-    # then use get or set to store and query data:
-    # kad_client.set("foo", "bar")
-    # print(kad_client.get("foo"))
-    #
-    # If you create additional threads to interact with this client,
-    # aside from the main thread that your program runs on,
-    # make sure each additional thread has an event loop by doing something
-    # like this at the beginning of the thread:
-    # event_loop = asyncio.new_event_loop()
-    # asyncio.set_event_loop(event_loop)
-    #
+
     def __init__(self, create, kademlia_port, kademlia_hosts, log_level=logging.NOTSET):
         self.logger = logging.getLogger('kademlia')
         self.log_level = log_level
@@ -54,7 +39,6 @@ class KademliaClient:
     # Performs a get against the Kademlia node, storing the result in the
     # resp_future parameter
     async def do_get(self, name, resp_future):
-        # Perform the get
         result = await self.kademlia_node.get(name)
 
         # Store the result in the future, using the future's own event loop
@@ -63,7 +47,6 @@ class KademliaClient:
     # performs a set against the Kademlia node, storing True in the resp_future
     # parameter to indicate success
     async def do_set(self, name, value, resp_future):
-        # Perform the set
         await self.kademlia_node.set(name, value)
 
         # Store True in the resp_future to signal completion
