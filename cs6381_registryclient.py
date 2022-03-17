@@ -12,7 +12,7 @@ class Registry:
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REQ)
         # self.socket.setsockopt(zmq.RCVTIMEO, 1000)  # set timeout of 1 seconds
-        self.socket_should_start = self.context.socket(zmq.PAIR)
+        self.socket_should_start = self.context.socket(zmq.SUB)
         self.socket_registry_data = self.context.socket(zmq.SUB)
         self.poller = zmq.Poller()
 
@@ -27,13 +27,14 @@ class Registry:
 
         self.num_pubs = None
         self.num_subs = None
+        self.num_registries = None
         self.topo = None
 
         self.registry_ips = []
         self.lock = threading.Lock()
 
     def get_new_registry_data(self, topics):
-        registry_info = [constants.REGISTRY_NODES, constants.PUB_COUNT, constants.SUB_COUNT, constants.BROKER_IP]
+        registry_info = [constants.REGISTRY_NODES, constants.BROKER_IP, "start"]
         if topics is not None:
             registry_info.extend(topics)
 
@@ -67,19 +68,23 @@ class Registry:
                         self.client.subscribe(topic)
 
     def get_start_status(self):
+        message = "wait"
         # self.socket_should_start.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PUSH_PORT_NUMBER))
         # self.poller.register(self.socket_should_start, zmq.POLLIN)
-
+        self.socket_should_start.setsockopt_string(zmq.SUBSCRIBE, "start")
         print("checking start")
         # polls server to see if ready to start
-        while not self.should_start:
-            event = dict(self.poller.poll(2000))
+        while True:
+            event = dict(self.poller.poll(1000))
             if self.socket_should_start in event:
                 message = self.socket_should_start.recv_string()
                 print("message received for start status: %s" % message)
-                if message.startswith("start"):
-                    self.should_start = True
-                    print("START!!!", message)
+            if message.startswith("start"):
+                self.should_start = True
+                print("START!!!", message)
+                break
+            else:
+                pass
 
     def connect_registry(self):
         #  connect to Registry Server
@@ -88,19 +93,19 @@ class Registry:
 
     def connect_server(self):
         #  connect to Registry Server
-        # print("connecting to registry server at {} {}".format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
-        # self.socket.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
+        print("connecting to registry server at {} {}".format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
+        self.socket.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
 
-        # self.socket_should_start.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PUSH_PORT_NUMBER))
-        # self.poller.register(self.socket_should_start, zmq.POLLIN)
+        self.socket_should_start.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PUSH_PORT_NUMBER))
+        self.poller.register(self.socket_should_start, zmq.POLLIN)
 
-        thread_registry = threading.Thread(target=self.connect_registry)
-        thread_registry.setDaemon(True)
-        thread_registry.start()
+        # thread_registry = threading.Thread(target=self.connect_registry)
+        # thread_registry.setDaemon(True)
+        # thread_registry.start()
 
-        # thread_should_start = threading.Thread(target=self.get_start_status)
-        # thread_should_start.setDaemon(True)
-        # thread_should_start.start()
+        thread_should_start = threading.Thread(target=self.get_start_status)
+        thread_should_start.setDaemon(True)
+        thread_should_start.start()
 
     def register(self, topics=None):
         print("in register method for topics: {} ".format(topics))
@@ -150,17 +155,15 @@ class Registry:
                     broker_ip = self.socket.recv_string(1)
                     print("broker's ip: %s" % broker_ip)
                 else:
-                    broker_ip = None
-                    print("broker ip not received for broker dissemination strategy!")
-                    while broker_ip is None:
-                        broker_ip = self.get_topic_connection(constants.BROKER_IP)
-                        time.sleep(1)
-                    print("broker's ip: %s" % broker_ip)
+                    broker_ip = self.get_broker_ip()
+
+                while not self.should_start:
+                    pass
                 self.client.start(broker_ip)
             else:
+                while not self.should_start:
+                    pass
                 self.client.start()
-
-            print("registered publisher: {}".format(self.client))
         else:
             print("error - publisher not registered!")
 
@@ -172,21 +175,22 @@ class Registry:
 
         self.socket.send_string('{} {} {} {}'.format(constants.REGISTER, self.role, self.address, self.port))
         message = self.socket.recv_string(0)
-        success, topo, pubs, subs = message.split(" ")
+        success, topo, pubs, subs, registries = message.split(" ")
+        # used only for data file name creation
         if success == "success":
             self.topo = topo
             self.num_pubs = pubs
             self.num_subs = subs
+            self.num_registries = registries
 
         if message:
             print(message)
-            while registry is None or len(registry) <= 1:
+            while registry is None or len(registry) <= 0:
+                registry = self.get_registry(constants.SUB)
                 if registry is not None and registry["nodes"]:
                     self.registry_ips = registry["nodes"]
                     for ip in self.registry_ips:
                         self.socket_registry_data.connect('tcp://{}:{}'.format(ip, constants.REGISTRY_PUB_PORT_NUMBER))
-
-                registry = self.get_registry(constants.SUB)
                 time.sleep(2)
         print("REGISTRY:")
         print(registry)
@@ -201,19 +205,13 @@ class Registry:
                         self.client.subscribe(topic)
             elif self.strategy == constants.BROKER:
                 print("Must start Broker App first!")
-                broker_ip = None
-                print("broker ip not received for broker dissemination strategy!")
-                while broker_ip is None:
-                    broker_ip = self.get_topic_connection(constants.BROKER_IP)
-                print("broker's ip: %s" % broker_ip)
+                broker_ip = self.get_broker_ip()
                 self.client.connect('tcp://{}:{}'.format(broker_ip, self.port))
                 self.client.subscribe(topic)
 
-        # while not self.should_start:
-        #     pass
-        self.client.start(self.num_pubs, self.num_subs, self.strategy, self.topo)
-
-        print("registered subscriber: {}".format(self.client))
+        while not self.should_start:
+            pass
+        self.client.start(self.num_pubs, self.num_subs, self.num_registries, self.strategy, self.topo)
 
     def get_topic_connection(self, topic):
         self.socket.send_string('{} {}'.format(constants.DISCOVER, topic))
@@ -227,4 +225,12 @@ class Registry:
         self.socket.send_string('{} {}'.format(constants.REGISTRY, client))
         message = self.socket.recv()
         return json.loads(message)
+
+    def get_broker_ip(self):
+        broker_ip = None
+        print("broker ip not received for broker dissemination strategy!")
+        while broker_ip is None:
+            broker_ip = self.get_topic_connection(constants.BROKER_IP)
+        print("broker's ip: %s" % broker_ip)
+        return broker_ip
 

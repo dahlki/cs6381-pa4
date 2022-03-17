@@ -15,26 +15,30 @@ def parseCmdLineArgs():
     parser = argparse.ArgumentParser(description="Registry")
     parser.add_argument("-d", "--disseminate", choices=["direct", "broker"], default="direct",
                         help="Dissemination strategy: direct or via broker; default is direct")
-    parser.add_argument("-p", "--publishers", type=int, default=1, help="number of publishers")
-    parser.add_argument("-s", "--subscribers", type=int, default=1, help="number of subscribers")
-
+    parser.add_argument("-p", "--publishers", type=int, default=1,
+                        help="number of publishers that need to register before dissemination begins")
+    parser.add_argument("-s", "--subscribers", type=int, default=1,
+                        help="number of subscribers that need to register before dissemination begins")
+    parser.add_argument("-r", "--registries", type=int, default=1,
+                        help="number of registries; used for data collection info only")
     parser.add_argument("-c", "--create", default=False, action="store_true",
                         help="Create a new DHT ring, otherwise we join a DHT")
-    parser.add_argument("-l", "--debug", default=logging.NOTSET, action="store_true",
+    parser.add_argument("-l", "--debug", default=logging.WARNING, action="store_true",
                         help="Logging level (see logging package): default WARNING else DEBUG")
     parser.add_argument("-i", "--ipaddr", type=str, default=None, help="IP address of any existing DHT node")
-    parser.add_argument("-r", "--port", help="port number used by one or more DHT nodes", type=int, default=8468)
-    parser.add_argument("-t", "--topo", help="mininet topology", choices=["linear", "tree"], type=str, default="linear")
+    parser.add_argument("-o", "--port", help="port number used by one or more DHT nodes", type=int, default=8468)
+    parser.add_argument("-t", "--topo", help="mininet topology; used for data collection info only",
+                        choices=["linear", "tree"], type=str, required=True)
 
     return parser.parse_args()
 
 
 class RegistryServer:
 
-    def __init__(self, topo, strategy, pubs=1, subs=1):
+    def __init__(self, topo, strategy, pubs=1, subs=1, registries=1):
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REP)
-        self.socket_start_notification = self.context.socket(zmq.PAIR)
+        self.socket_start_notification = self.context.socket(zmq.PUB)
         self.socket_registry_data = self.context.socket(zmq.PUB)
         self.ip = get_system_address()
         self.ipaddr = None
@@ -42,7 +46,9 @@ class RegistryServer:
         self.broker = 1 if strategy == constants.BROKER else 0
         self.pubs = pubs
         self.subs = subs
+        self.registries = registries
         self.wait = True
+        self.first_node = False
 
         self.kad_client = None
         self.helper = None
@@ -101,9 +107,11 @@ class RegistryServer:
 
         self.helper.set_registry("nodes", self.ip)
         self.helper.set_registry_node(self.ip)
-        self.helper.set(constants.PUB_COUNT, self.pubs)
-        self.helper.set(constants.SUB_COUNT, self.subs)
-        self.helper.set(constants.BROKER_COUNT, self.broker)
+        if self.first_node:
+            self.helper.set(constants.PUB_COUNT, self.pubs)
+            self.helper.set(constants.SUB_COUNT, self.subs)
+            self.helper.set(constants.BROKER_COUNT, self.broker)
+            self.helper.set("fileData", "{} {} {} {}".format(self.topo, self.pubs, self.subs, self.registries))
 
         print("registry starting to receive requests")
 
@@ -138,23 +146,28 @@ class RegistryServer:
                         self.pub_registration(address, port, topics)
 
                         pub_nums = self.helper.get(constants.PUB_COUNT)
+                        print("current pub count: {}".format(pub_nums))
                         if pub_nums > 0:
-                            print("******* updating pub num")
-                            self.helper.set(constants.PUB_COUNT, pub_nums - 1)
+                            pub_nums -= 1
+                            print("******* updating pub num to {}".format(pub_nums))
+                            self.helper.set(constants.PUB_COUNT, pub_nums)
                         self.socket_registry_data.send_string(constants.PUB_COUNT, pub_nums)
 
                     if role == constants.SUB:
                         sub_nums = self.helper.get(constants.SUB_COUNT)
+                        print("current pub count: {}".format(sub_nums))
                         if sub_nums > 0:
-                            print("******* updating sub num")
-                            self.helper.set(constants.SUB_COUNT, sub_nums - 1)
-                        self.socket.send_string("success {} {} {}".format(self.topo, self.pubs, self.subs))
+                            sub_nums -= 1
+                            print("******* updating sub num to {}".format(sub_nums))
+                            self.helper.set(constants.SUB_COUNT, sub_nums)
+                        meta_data = self.helper.get("fileData")
+                        self.socket.send_string("success {}".format(meta_data))
 
                 elif action == constants.DISCOVER:
                     topic = info[0]
                     print('retrieving address for: {}'.format(topic))
                     if topic:
-                        address = self.helper.discover(topic)
+                        address = self.helper.get(topic)
                         print(address)
                         self.socket.send_string(json.dumps(address))
 
@@ -194,8 +207,10 @@ class RegistryServer:
             time.sleep(2)
 
     def start(self, args):
+        print("my ip - registry:", self.ip)
         print("starting registry server on port: {}".format(constants.REGISTRY_PORT_NUMBER))
         print("args", args)
+        self.first_node = True if args.create else False
 
         # self.socket.bind('tcp://*:{}'.format(constants.REGISTRY_PORT_NUMBER))
 
@@ -212,14 +227,14 @@ class RegistryServer:
         registry_thread.start()
         registry_pub_thread.start()
 
-        # should_start_thread = threading.Thread(target=self.should_start)
-        # should_start_thread.setDaemon(True)
-        # should_start_thread.start()
+        should_start_thread = threading.Thread(target=self.should_start)
+        should_start_thread.setDaemon(True)
+        should_start_thread.start()
 
 
 def main():
     args = parseCmdLineArgs()
-    registry = RegistryServer(args.topo, args.disseminate, args.publishers, args.subscribers)
+    registry = RegistryServer(args.topo, args.disseminate, args.publishers, args.subscribers, args.registries)
     registry.start(args)
 
 

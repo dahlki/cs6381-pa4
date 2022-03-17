@@ -81,18 +81,20 @@ class RegistryHelper:
         # return False if value is already in list for key
         return False
 
-    def serialize(self, obj, key, value, single_value):
+    def serialize_object(self, kad_object_key, key, value, single_value=False):
+        # if value is not a list
         if single_value:
-            obj[key] = value
-            return json.dumps(obj)
+            kad_object_key[key] = value
+            return json.dumps(kad_object_key)
 
-        if not obj or not(key in obj):
-            obj[key] = [value]
+        # if value is to be added to a list
+        if not kad_object_key or not(key in kad_object_key):
+            kad_object_key[key] = [value]
         else:
-            values = obj[key]
+            values = kad_object_key[key]
             if not(value in values):
                 values.append(value)
-        return json.dumps(obj)
+        return json.dumps(kad_object_key)
 
     def get_registry(self):
         registry = self.kademlia_client.get("registry")
@@ -101,12 +103,9 @@ class RegistryHelper:
             return json.loads(registry)
         return {}
 
-    def set_registry(self, topic, connection, single_value=False):
+    def set_registry(self, topic, connection):
         current_registry = self.get_registry()
         print("CURRENT_REGISTRY", current_registry)
 
-        registry = self.serialize(current_registry, topic, connection, single_value)
+        registry = self.serialize_object(current_registry, topic, connection)
         self.kademlia_client.set("registry", registry)
-
-    def discover(self, topic):
-        return self.get(topic)
