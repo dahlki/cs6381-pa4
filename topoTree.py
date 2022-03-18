@@ -11,6 +11,8 @@ from mininet.clean import cleanup
 import itertools
 import time
 
+import cs6381_util
+
 
 def parseCmdLineArgs():
     parser = argparse.ArgumentParser(description="testing with Mininet Tree Topology")
@@ -34,11 +36,13 @@ def start_tree_topology(depth=3, fanout=3, strategy="direct", num_pubs=1, num_su
     registry_broker = num_registries if strategy == "direct" else (num_registries + 1)
     if max_hosts < (num_pubs + num_subs + registry_broker):
         print("not enough host nodes for number of pubs and subs")
+        return
 
     cleanup()
     net = TreeNet(depth=depth, fanout=fanout)
     # net = Mininet(topo=tree)
     net.start()
+    time.sleep(1)
 
     # print(net.hosts)
 
@@ -60,13 +64,13 @@ def start_tree_topology(depth=3, fanout=3, strategy="direct", num_pubs=1, num_su
     # run registry
     for count, h in enumerate(registry_hosts):
         def registry_startup_create(registry):
-            registry_cmd = "python3 -u cs6381_registry.py -c -p {} -s {} -r {} -d {} -t tree &> 'results/{}-{}-{}-{}-tree-registry-{}-{}.log' &".format(
+            registry_cmd = "python3 -u cs6381_registry.py -c -p {} -s {} -r {} -d {} -t tree &> 'results/logs/{}-{}-{}-{}-tree-registry-{}-{}.log' &".format(
                 num_pubs, num_subs, num_registries, strategy, num_pubs, num_subs, num_registries, strategy, registry.name, timestamp)
             registry.cmd(registry_cmd)
 
         def registry_startup(registry):
             existing_registry = random.choice(created_registry_hosts)
-            registry_cmd = "python3 -u cs6381_registry.py -i {} -p {} -s {} -r {} -d {} -t tree &> 'results/{}-{}-{}-{}-tree-registry-{}-{}.log' &".format(
+            registry_cmd = "python3 -u cs6381_registry.py -i {} -p {} -s {} -r {} -d {} -t tree &> 'results/logs/{}-{}-{}-{}-tree-registry-{}-{}.log' &".format(
                 existing_registry, num_pubs, num_subs, num_registries, strategy, num_pubs, num_subs, num_registries, strategy, registry.name, timestamp)
             registry.cmd(registry_cmd)
 
@@ -83,7 +87,7 @@ def start_tree_topology(depth=3, fanout=3, strategy="direct", num_pubs=1, num_su
         def broker_startup(registry):
             broker_host = hosts.pop()
             print("broker: {}, connecting to registry: {}".format(broker_host.name, registry))
-            brokerapp_cmd = "python3 -u brokerapp.py -i {} &> 'results/{}-{}-{}-{}-tree-broker-{}-{}.log' &".format(registry, num_pubs, num_subs, num_registries, strategy, broker_host.name, timestamp)
+            brokerapp_cmd = "python3 -u brokerapp.py -i {} &> 'results/logs/{}-{}-{}-{}-tree-broker-{}-{}.log' &".format(registry, num_pubs, num_subs, num_registries, strategy, broker_host.name, timestamp)
             broker_host.cmd(brokerapp_cmd)
 
         random_registry_host = random.choice(created_registry_hosts)
@@ -95,7 +99,7 @@ def start_tree_topology(depth=3, fanout=3, strategy="direct", num_pubs=1, num_su
         def pub_startup(registry):
             pub_host = hosts.pop()
             print("pub: {}, connecting to registry: {}".format(pub_host.name, registry))
-            pubapp_cmd = "python3 -u pubapp.py -d {} -i {} &> 'results/{}-{}-{}-{}-tree-pub-{}-{}.log' &".format(strategy, registry, num_pubs, num_subs, num_registries, strategy,
+            pubapp_cmd = "python3 -u pubapp.py -d {} -i {} &> 'results/logs/{}-{}-{}-{}-tree-pub-{}-{}.log' &".format(strategy, registry, num_pubs, num_subs, num_registries, strategy,
                                                                                              pub_host.name, timestamp)
             pub_host.cmd(pubapp_cmd)
 
@@ -108,8 +112,8 @@ def start_tree_topology(depth=3, fanout=3, strategy="direct", num_pubs=1, num_su
         def sub_startup(registry):
             sub_host = hosts.pop()
             print("sub: {}, connecting to registry: {}".format(sub_host.name, registry))
-            subapp_cmd = "python3 -u subapp.py -d {} -i {} &> 'results/{}-{}-{}-{}-tree-sub-{}-{}.log' &".format(strategy, registry, num_pubs, num_subs, num_registries, strategy,
-                                                                                             sub_host.name)
+            subapp_cmd = "python3 -u subapp.py -d {} -i {} &> 'results/logs/{}-{}-{}-{}-tree-sub-{}-{}.log' &".format(
+                strategy, registry, num_pubs, num_subs, num_registries, strategy, sub_host.name, timestamp)
             sub_host.cmd(subapp_cmd)
 
         random_registry_host = random.choice(created_registry_hosts)

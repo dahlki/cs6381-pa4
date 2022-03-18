@@ -28,7 +28,7 @@ def parseCmdLineArgs():
     parser.add_argument("-i", "--ipaddr", type=str, default=None, help="IP address of any existing DHT node")
     parser.add_argument("-o", "--port", help="port number used by one or more DHT nodes", type=int, default=8468)
     parser.add_argument("-t", "--topo", help="mininet topology; used for data collection info only",
-                        choices=["linear", "tree"], type=str, required=True)
+                        choices=["linear", "tree"], type=str)
 
     return parser.parse_args()
 

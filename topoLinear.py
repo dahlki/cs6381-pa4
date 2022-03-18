@@ -39,10 +39,12 @@ def start_linear_topology(host_num=1, switches=10, strategy="direct", num_pubs=1
     registry_broker = num_registries if strategy == "direct" else (num_registries + 1)
     if max_hosts < (num_pubs + num_subs + registry_broker):
         print("not enough host nodes for number of pubs and subs")
+        return
 
     cleanup()
     net = Mininet(LinearTopo(k=switches, n=host_num))
     net.start()
+    time.sleep(1)
 
     # print(net.hosts)
 
@@ -53,7 +55,7 @@ def start_linear_topology(host_num=1, switches=10, strategy="direct", num_pubs=1
 
     for i in range(num_registries):
         h = hosts.pop()
-        host_ip = get_host_ip(h)
+        host_ip = get_host_ip(h, switches)
         # host_number = h.name[1:]
         # host_ip = "10.0.0.{}".format(host_number)
         print("registry: {}, ip: {}".format(h, host_ip))
@@ -65,13 +67,13 @@ def start_linear_topology(host_num=1, switches=10, strategy="direct", num_pubs=1
     # run registry
     for count, h in enumerate(registry_hosts):
         def registry_startup_create(registry):
-            registry_cmd = "python3 -u cs6381_registry.py -c -p {} -s {} -r {} -d {} -t linear &> 'results/{}-{}-{}-{}-linear-registry-{}-{}.log' &".format(
+            registry_cmd = "python3 -u cs6381_registry.py -c -p {} -s {} -r {} -d {} -t linear &> 'results/logs/{}-{}-{}-{}-linear-registry-{}-{}.log' &".format(
                 num_pubs, num_subs, num_registries, strategy, num_pubs, num_subs, num_registries, strategy, registry.name, timestamp)
             registry.cmd(registry_cmd)
 
         def registry_startup(registry):
             existing_registry = random.choice(created_registry_hosts)
-            registry_cmd = "python3 -u cs6381_registry.py -i {} -p {} -s {} -r {} -d {} -t linear &> 'results/{}-{}-{}-{}-linear-registry-{}-{}.log' &".format(
+            registry_cmd = "python3 -u cs6381_registry.py -i {} -p {} -s {} -r {} -d {} -t linear &> 'results/logs/{}-{}-{}-{}-linear-registry-{}-{}.log' &".format(
                 existing_registry, num_pubs, num_subs, num_registries, strategy, num_pubs, num_subs, num_registries, strategy, registry.name, timestamp)
             registry.cmd(registry_cmd)
 
@@ -88,7 +90,7 @@ def start_linear_topology(host_num=1, switches=10, strategy="direct", num_pubs=1
         def broker_startup(registry):
             broker_host = hosts.pop()
             print("broker: {}, connecting to registry: {}".format(broker_host.name, registry))
-            brokerapp_cmd = "python3 -u brokerapp.py -i {} &> 'results/{}-{}-{}-{}-linear-broker-{}-{}.log' &".format(registry, num_pubs, num_subs, num_registries, strategy,
+            brokerapp_cmd = "python3 -u brokerapp.py -i {} &> 'results/logs/{}-{}-{}-{}-linear-broker-{}-{}.log' &".format(registry, num_pubs, num_subs, num_registries, strategy,
                                                                                                 broker_host.name, timestamp)
             broker_host.cmd(brokerapp_cmd)
 
@@ -101,7 +103,7 @@ def start_linear_topology(host_num=1, switches=10, strategy="direct", num_pubs=1
         def pub_startup(registry):
             pub_host = hosts.pop()
             print("pub: {}, connecting to registry: {}".format(pub_host.name, registry))
-            pubapp_cmd = "python3 -u pubapp.py -d {} -i {} &> 'results/{}-{}-{}-{}-linear-pub-{}-{}.log' &".format(strategy, registry, num_pubs, num_subs, num_registries, strategy,
+            pubapp_cmd = "python3 -u pubapp.py -d {} -i {} &> 'results/logs/{}-{}-{}-{}-linear-pub-{}-{}.log' &".format(strategy, registry, num_pubs, num_subs, num_registries, strategy,
                                                                                              pub_host.name, timestamp)
             pub_host.cmd(pubapp_cmd)
 
@@ -114,7 +116,7 @@ def start_linear_topology(host_num=1, switches=10, strategy="direct", num_pubs=1
         def sub_startup(registry):
             sub_host = hosts.pop()
             print("sub: {}, connecting to registry: {}".format(sub_host.name, registry))
-            subapp_cmd = "python3 -u subapp.py -d {} -i {} &> 'results/{}-{}-{}-{}-linear-sub-{}-{}.log' &".format(strategy, registry, num_pubs, num_subs, num_registries, strategy,
+            subapp_cmd = "python3 -u subapp.py -d {} -i {} &> 'results/logs/{}-{}-{}-{}-linear-sub-{}-{}.log' &".format(strategy, registry, num_pubs, num_subs, num_registries, strategy,
                                                                                              sub_host.name, timestamp)
             sub_host.cmd(subapp_cmd)
 
@@ -129,17 +131,16 @@ def start_linear_topology(host_num=1, switches=10, strategy="direct", num_pubs=1
     dumpNodeConnections(net.hosts)
 
 
-def get_host_ip(host):
+def get_host_ip(host, switches):
     print(host)
     # host like h2s6 or h12
     host_number = host.name[1:]
     if "s" in host_number:
         a, b = host_number.split("s")
         a = int(a) - 1
-        a = str(a if a > 0 else "")
-        if int(b) >= 10:
-            b = str(int(a) + int(b))
-        return "10.0.0.{}".format(a + b)
+        a = a * switches
+        host_num = a + int(b)
+        return "10.0.0.{}".format(host_num)
     else:
         return "10.0.0.{}".format(host_number)
 
@@ -155,7 +156,10 @@ def main():
     time_to_run = args.time
     num_registries = args.registries
 
-    start_linear_topology(hosts, switches, strategy, num_pubs, num_subs, num_registries, time_to_run)
+    try:
+        start_linear_topology(hosts, switches, strategy, num_pubs, num_subs, num_registries, time_to_run)
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == "__main__":

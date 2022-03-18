@@ -11,17 +11,24 @@ import argparse
 
 
 class Plot:
-    def __init__(self, csv_filepath, graph_filename):
+    def __init__(self, csv_filepath, graph_filename, title, ticks):
         self.x = []
         self.y = []
         self.csv_filepath = csv_filepath
         self.graph_filename = graph_filename
+        self.title = title
+        self.ticks = ticks
 
     def plot(self):
 
+        is_registry_plot = "regs" in self.csv_filepath
+
         csv_data = pd.read_csv(self.csv_filepath)
         df = pd.DataFrame(csv_data)
-        df.sort_values(by="pubs/subs")
+        # if not is_registry_plot:
+        #     df.sort_values(by="pubs/subs")
+        # else:
+        #     df.sort_values(by="registries")
         # sorted_data = csv_data.sort_values(['pubs/subs'], inplace=True)
         print(df)
 
@@ -31,27 +38,40 @@ class Plot:
             # lines = sorted(lines, key=lambda col: (col[0], col[1]))
 
             for row in lines:
-                self.x.append(row[0])
-                self.y.append(float(row[1]))
+                print(row)
+                if not is_registry_plot:
+                    self.x.append(row[0])
+                    x = [1, 2, 3, 4, 5, 10, 20]
+                else:
+                    self.x.append(row[1])
+                    x = [1, 2, 4, 6, 8, 10]
+                self.y.append(float(row[2]))
+        print(self.x)
+        print(self.y)
 
         f = plt.figure()
         f.set_figwidth(10)
         f.set_figheight(5)
-        plt.plot(self.x, self.y, color='g', linestyle='dashed', marker='o', label="average time delay")
 
-        plt.yticks(np.arange(min(self.y), max(self.y), .1))
-        plt.xticks(rotation=25)
-        plt.xlabel('pubs/subs')
+
+        plt.plot(x, self.y, color='g', linestyle='dashed', marker='o', label="average time delay")
+
+        plt.yticks(np.arange(min(self.y), max(self.y), self.ticks))
+        plt.xticks(x, self.x, rotation=25)
+        if not is_registry_plot:
+            plt.xlabel('pubs/subs')
+        else:
+            plt.xlabel('registries')
         plt.ylabel('delay in seconds')
-        plt.title('one sub, increasing number of pubs - broker dissemination', fontsize=20)
+        plt.title(self.title, fontsize=20)
         plt.grid()
         plt.legend()
         plt.tight_layout()
 
         for i, label in enumerate(self.y):
-            plt.text(self.x[i], self.y[i], self.y[i])
+            plt.text(x[i], self.y[i], self.y[i])
 
-        plt.savefig(self.graph_filename)
+        plt.savefig('results/{}/{}'.format(self.graph_filename, self.graph_filename))
         plt.show()
 
 
@@ -60,13 +80,16 @@ def parseCmdLineArgs():
     parser = argparse.ArgumentParser(description="Plotting Application")
     parser.add_argument("-f", "--file", type=str, required=True, help="path to csv file")
     parser.add_argument("-g", "--graph", type=str, required=True, help="name of png file to save graph")
+    parser.add_argument("-t", "--title", type=str, required=True, help="title of graph")
+    parser.add_argument("-u", "--ticks", type=float, default=.0001,
+                        help="y axis representation of units in ms; default .0001")
 
     return parser.parse_args()
 
 
 def main():
     args = parseCmdLineArgs()
-    plot = Plot(args.file, args.graph)
+    plot = Plot(args.file, args.graph, args.title, args.ticks)
     plot.plot()
 
 

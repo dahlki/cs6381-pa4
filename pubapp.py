@@ -87,8 +87,8 @@ def parseCmdLineArgs():
                         help="specify port number; default is 5555")
     parser.add_argument("-n", "--number", type=int, choices=range(1, 9), default=None,
                         help="number of topics to publish; between 1 and 8; default will be random number of topics")
-    parser.add_argument("-t", "--time", type=float, default=.1,
-                        help="specify seconds between publishing messages; default is 0")
+    parser.add_argument("-t", "--time", type=float, default=.05,
+                        help="specify seconds between publishing messages; default is 0.05")
     parser.add_argument("-i", "--registryIP", type=str, help="IP address of any existing Registry node")
 
 
