@@ -50,8 +50,8 @@ class Plot:
         print(self.y)
 
         f = plt.figure()
-        f.set_figwidth(10)
-        f.set_figheight(5)
+        f.set_figwidth(15)
+        f.set_figheight(10)
 
 
         plt.plot(x, self.y, color='g', linestyle='dashed', marker='o', label="average time delay")
@@ -66,7 +66,7 @@ class Plot:
         plt.title(self.title, fontsize=20)
         plt.grid()
         plt.legend()
-        plt.tight_layout()
+        # plt.tight_layout()
 
         for i, label in enumerate(self.y):
             plt.text(x[i], self.y[i], self.y[i])

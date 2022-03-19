@@ -44,7 +44,7 @@ def start_linear_topology(host_num=1, switches=10, strategy="direct", num_pubs=1
     cleanup()
     net = Mininet(LinearTopo(k=switches, n=host_num))
     net.start()
-    time.sleep(1)
+    # time.sleep(1)
 
     # print(net.hosts)
 
