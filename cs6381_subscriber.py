@@ -28,7 +28,7 @@ class Subscriber(object):
         self.port = port
         self.strategy = strategy
         self.uuid = cs6381_util.create_uuid()
-        self.iterations = 1000
+        self.iterations = 500
         self.topics = {}
         self.cb = None
         self.messages = {}

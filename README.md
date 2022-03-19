@@ -180,19 +180,19 @@ create a text file with commands to run the applications
 
 example with broker dissemination and 2 pub (publishing 8 topics each) and 5 subs:
 ~~~
-h1 python3 -u cs6381_registry.py -c -p 1 -s 5 -r 2 -t tree -d broker &> results/1-5-2-broker-tree-logs/registry1.out &
-h3 python3 -u cs6381_registry.py -i 10.0.0.1 -p 1 -s 5 -t tree -d broker &> results/1-5-2-broker-tree-logs/registry2.out &
+h1 python3 -u cs6381_registry.py -c -p 1 -s 5 -r 2 -t tree -d broker &> results/logs/1-5-2-broker-tree-logs/registry1.out &
+h3 python3 -u cs6381_registry.py -i 10.0.0.1 -p 1 -s 5 -t tree -d broker &> results/logs/1-5-2-broker-tree-logs/registry2.out &
 
-h2 python3 -u brokerapp.py -i 10.0.0.1 &> results/1-5-2-broker-tree-logs/broker.out &
+h2 python3 -u brokerapp.py -i 10.0.0.1 &> results/logs/1-5-2-broker-tree-logs/broker.out &
 
-h5 python3 -u pubapp.py -i 10.0.0.1 -d broker -n 8 &> results/1-5-2-broker-tree-logs/publisher1.out &
-h12 python3 -u pubapp.py -i 10.0.0.1 -d broker -n 8 &> results/1-5-2-broker-tree-logs/publisher2.out &
+h5 python3 -u pubapp.py -i 10.0.0.1 -d broker -n 8 &> results/logs/1-5-2-broker-tree-logs/publisher1.out &
+h12 python3 -u pubapp.py -i 10.0.0.1 -d broker -n 8 &> results/logs/1-5-2-broker-tree-logs/publisher2.out &
 
-h8 python3 -u subapp.py -i 10.0.0.1 -d broker &> results/1-5-2-broker-tree-logs/subscriber1.out &
-h15 python3 -u subapp.py -i 10.0.0.1 -d broker &> results/1-5-2-broker-tree-logs/subscriber2.out &
-h4 python3 -u subapp.py -i 10.0.0.1 -d broker &> results/1-5-2-broker-tree-logs/subscriber3.out &
-h9 python3 -u subapp.py -i 10.0.0.1 -d broker &> results/1-5-2-broker-tree-logs/subscriber4.out &
-h6 python3 -u subapp.py -i 10.0.0.1 -d broker &> results/1-5-2-broker-tree-logs-logs/subscriber5.out &
+h8 python3 -u subapp.py -i 10.0.0.1 -d broker &> results/logs/1-5-2-broker-tree-logs/subscriber1.out &
+h15 python3 -u subapp.py -i 10.0.0.1 -d broker &> results/logs/1-5-2-broker-tree-logs/subscriber2.out &
+h4 python3 -u subapp.py -i 10.0.0.1 -d broker &> results/logs/1-5-2-broker-tree-logs/subscriber3.out &
+h9 python3 -u subapp.py -i 10.0.0.1 -d broker &> results/logs/1-5-2-broker-tree-logs/subscriber4.out &
+h6 python3 -u subapp.py -i 10.0.0.1 -d broker &> results/logs/1-5-2-broker-tree-logs-logs/subscriber5.out &
 ~~~
 
 in the ubuntu vm terminal, create a mininet topology, making sure there are enough hosts to accommodate the registry + broker + pubs + subs

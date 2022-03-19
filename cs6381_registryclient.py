@@ -22,7 +22,7 @@ class Registry:
         self.strategy = strategy
         self.serverIP = "localhost" if self.address == "localhost" else registry_ip
         self.client = client
-        self.should_start = False
+        self.should_start = True
         self.connect_server()
 
         self.num_pubs = None
@@ -103,9 +103,9 @@ class Registry:
         # thread_registry.setDaemon(True)
         # thread_registry.start()
 
-        thread_should_start = threading.Thread(target=self.get_start_status)
-        thread_should_start.setDaemon(True)
-        thread_should_start.start()
+        # thread_should_start = threading.Thread(target=self.get_start_status)
+        # thread_should_start.setDaemon(True)
+        # thread_should_start.start()
 
     def register(self, topics=None):
         print("in register method for topics: {} ".format(topics))

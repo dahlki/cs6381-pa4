@@ -6,9 +6,9 @@ import logging
 
 class KademliaClient:
 
-    def __init__(self, create, kademlia_port, kademlia_hosts, log_level=logging.NOTSET):
+    def __init__(self, create, kademlia_port, kademlia_hosts, debug):
         self.logger = logging.getLogger('kademlia')
-        self.log_level = log_level
+        self.debug = debug
         self.create = create
         self.kademlia_hosts = kademlia_hosts
         self.kademlia_port = kademlia_port
@@ -120,7 +120,7 @@ class KademliaClient:
 
     async def init_server(self):
         try:
-            self.set_log_level(self.log_level)
+            self.set_log_level(self.debug)
             # Create a Kademlia node
             self.kademlia_node = Server()
 
@@ -132,9 +132,12 @@ class KademliaClient:
         except Exception as e:
             print(e, flush=True)
 
-    def set_log_level(self, log_level):
+    def set_log_level(self, debug):
         handler = logging.StreamHandler()
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
-        self.logger.setLevel(log_level)
+        if debug:
+            self.logger.setLevel(logging.DEBUG)
+        else:
+            self.logger.setLevel(logging.WARNING)

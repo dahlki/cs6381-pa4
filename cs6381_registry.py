@@ -70,6 +70,7 @@ class RegistryServer:
     def should_start(self):
         self.socket_start_notification.bind('tcp://*:{}'.format(constants.REGISTRY_PUSH_PORT_NUMBER))
         while not(self.check_start()):
+            time.sleep(3)
             pass
         print("SENDING START SIGNAL!!!!!!!!!!")
         self.socket_start_notification.send_string("start")
@@ -221,15 +222,15 @@ class RegistryServer:
         registry_pub_thread.setDaemon(True)
 
         self.ipaddr = args.ipaddr if (args.ipaddr is not None and not args.create) else self.ip
-        self.kad_client = KademliaClient(args.create, args.port, [(self.ipaddr, args.port)])
+        self.kad_client = KademliaClient(args.create, args.port, [(self.ipaddr, args.port)], args.debug)
         self.helper = RegistryHelper(self.kad_client)
 
         registry_thread.start()
         registry_pub_thread.start()
 
-        should_start_thread = threading.Thread(target=self.should_start)
-        should_start_thread.setDaemon(True)
-        should_start_thread.start()
+        # should_start_thread = threading.Thread(target=self.should_start)
+        # should_start_thread.setDaemon(True)
+        # should_start_thread.start()
 
 
 def main():
