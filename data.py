@@ -5,7 +5,7 @@ import csv
 
 import cs6381_util
 
-
+# for collating total averages from each test/experiment into csv for plotting graphs
 class Data:
     def __init__(self, pubs, subs, regs, topo, dissemination):
         self.pubs = pubs

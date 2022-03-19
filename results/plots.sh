@@ -1,3 +1,5 @@
+# script for generating graphs using plots.py
+
 python3 plots.py -f results/pubs-broker-linear/pubs-broker-linear.csv -g pubs-broker-linear -t 'increasing pubs - one registry - broker dissemination - linear topology'
 python3 plots.py -f results/pubs-broker-tree/pubs-broker-tree.csv -g pubs-broker-tree -t 'increasing pubs - one registry - broker dissemination - tree topology'
 python3 plots.py -f results/pubs-direct-linear/pubs-direct-linear.csv -g pubs-direct-linear -t 'increasing pubs - one registry - direct dissemination - linear topology'

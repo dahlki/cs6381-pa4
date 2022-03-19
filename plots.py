@@ -9,7 +9,7 @@ import argparse
 # files = os.listdir(cwd)  # Get all the files in that directory
 # print("Files in %r: %s" % (cwd, files))
 
-
+# for creating graphs of test runs
 class Plot:
     def __init__(self, csv_filepath, graph_filename, title, ticks):
         self.x = []
