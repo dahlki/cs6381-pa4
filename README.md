@@ -1,6 +1,6 @@
 # cs6381: distributed systems principles
 
-### programming assignment 2: a Kademlia DHT-based discovery, multi-dissemination strategy publish-subscribe middleware application utilizing ZeroMQ
+### programming assignment 3: a fault-tolerant multi-dissemination publish-subscribe middleware application utilizing ZeroMQ, Kademlia and ZooKeeper
 <br/>
 
 <br/>
