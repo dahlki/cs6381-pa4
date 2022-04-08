@@ -19,6 +19,9 @@ import time
 from abc import abstractmethod
 import zmq
 import cs6381_util
+from cs6381_zkwatcher import Watcher
+import cs6381_constants as constants
+from cs6391_zkclient import ZooClient
 
 
 class Subscriber(object):
@@ -32,6 +35,14 @@ class Subscriber(object):
         self.topics = {}
         self.cb = None
         self.messages = {}
+
+        # self.zk = ZooClient().get_zk()
+        #
+        # self.broker_watcher = Watcher(self.zk, constants.SUB, constants.KAZOO_BROKER_PATH)
+        # self.watcher = self.broker_watcher.watch()
+        #
+        # self.registry_watcher = Watcher(self.zk, constants.SUB, constants.KAZOO_REGISTRY_PATH)
+        # self.watcher = self.registry_watcher.watch()
 
     @staticmethod
     def get_subscriber_instance(self):
@@ -52,6 +63,10 @@ class Subscriber(object):
     def start(self, num_pubs, num_subs, num_registries, strategy, topo):
         pass
 
+    @abstractmethod
+    def stop(self):
+        pass
+
     def notify(self, topics, cb):
         for topic in topics:
             self.topics.update({topic: topic})
@@ -66,8 +81,10 @@ class DirectSubscriber(Subscriber):
         self.address = address
         self.port = port
         self.strategy = strategy
+        self.connection = None
 
     def connect(self, connection_string):
+        self.connection = connection_string
         print("subscriber connecting to: {}".format(connection_string))
         self.socket.connect(connection_string)
 
@@ -89,6 +106,9 @@ class DirectSubscriber(Subscriber):
                 self.iterations -= 1
         cs6381_util.write_to_csv(num_pubs, num_subs, num_registries, strategy, topo)
 
+    def stop(self):
+        self.socket.disconnect(self.connection)
+
 
 class ViaBrokerSubscriber(Subscriber):
     def __init__(self, address, port, strategy):
@@ -98,8 +118,10 @@ class ViaBrokerSubscriber(Subscriber):
         self.address = address
         self.port = port
         self.strategy = strategy
+        self.connection = None
 
     def connect(self, connection_string):
+        self.connection = connection_string
         print("I am the send ViaBrokerSubscriber's connect method. connecting to {}".format(connection_string))
         self.socket.connect(connection_string)
 
@@ -123,3 +145,6 @@ class ViaBrokerSubscriber(Subscriber):
                     self.cb(data)
                 self.iterations -= 1
         cs6381_util.write_to_csv(num_pubs, num_subs, num_registries, strategy, topo)
+
+    def stop(self):
+        self.socket.disconnect(self.connection)

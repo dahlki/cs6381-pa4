@@ -20,3 +20,10 @@ REGISTRY_NODES = "registryNodes"
 PUB_COUNT = "pubCount"
 SUB_COUNT = "subCount"
 BROKER_COUNT = "brokerCount"
+
+KAZOO_IP = "10.0.0.1"
+KAZOO_PORT = "2181"
+
+KAZOO_BROKER_PATH = "/broker"
+KAZOO_REGISTRY_PATH = "/registry"
+KAZOO_REGISTRIES_PATH = "/registries"

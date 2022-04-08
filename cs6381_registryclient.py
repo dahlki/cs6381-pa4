@@ -1,9 +1,14 @@
+import random
 import threading
 
 import zmq
 import json
 import cs6381_constants as constants
 import time
+
+from cs6381_zkelection import Election
+from cs6381_zkwatcher import Watcher
+from cs6391_zkclient import ZooClient
 
 
 class Registry:
@@ -20,10 +25,9 @@ class Registry:
         self.address = address
         self.port = port
         self.strategy = strategy
-        self.serverIP = "localhost" if self.address == "localhost" else registry_ip
+        self.serverIP = "localhost" if self.address == "localhost" else None
         self.client = client
         self.should_start = True
-        self.connect_server()
 
         self.num_pubs = None
         self.num_subs = None
@@ -32,6 +36,65 @@ class Registry:
 
         self.registry_ips = []
         self.lock = threading.Lock()
+
+        self.zoo_client = ZooClient(role, self.address, self.port)
+        self.zoo_client.join_election()
+        self.zk = self.zoo_client.get_zk()
+
+        self.get_watcher(constants.KAZOO_REGISTRY_PATH, self.set_registry_ip)
+        # self.get_watcher(constants.KAZOO_REGISTRIES_PATH, self.get_registry_ip)
+        self.connect_server()
+
+    def set_registry_ip(self, path, data):
+        print("in registry callback...")
+        if data is not None:
+            data = data.decode()
+            ip, port = data.split(":")
+            if constants.KAZOO_REGISTRY_PATH in path:
+                self.serverIP = ip
+        print(f"{path}-{data}\n")
+
+    def get_registry_ip(self, path, data):
+        success = False
+        print("in registries callback...")
+        if data is not None:
+            print("DATA: {}".format(data))
+
+            data = data.decode()
+            addresses = data.split(",")
+            print(f"addresses: {addresses}")
+            address = random.choice(addresses)
+            print(f"address: {address}")
+            ip, port = address.split(":")
+
+            self.serverIP = ip
+            print(f"registry ip: {self.serverIP}")
+            while not success:
+                self.connect_server()
+                success = self.registry_heartbeat()
+                if not success and len(addresses) > 1:
+                    self.socket.disconnect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
+                    address_to_remove = "{}:{}".format(self.serverIP, port)
+                    addresses.remove(address_to_remove)
+                    address = random.choice(addresses)
+                    ip, port = address.split(":")
+                    self.serverIP = ip
+
+                print(success)
+        print(f"{path}-{data}\n")
+
+    def registry_heartbeat(self):
+        self.socket.send_string("heartbeat")
+        events = dict(self.poller.poll(1000))
+
+        if self.socket in events and events[self.socket] == zmq.POLLIN:
+            message = self.socket.recv_string()
+
+            if message and message == "beat":
+                print("RECEIVED HEARTBEAT!!!")
+                return True
+        return False
+
 
     def get_new_registry_data(self, topics):
         registry_info = [constants.REGISTRY_NODES, constants.BROKER_IP, "start"]
@@ -67,33 +130,9 @@ class Registry:
                         self.client.connect(connection)
                         self.client.subscribe(topic)
 
-    def get_start_status(self):
-        message = "wait"
-        # self.socket_should_start.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PUSH_PORT_NUMBER))
-        # self.poller.register(self.socket_should_start, zmq.POLLIN)
-        self.socket_should_start.setsockopt_string(zmq.SUBSCRIBE, "start")
-        print("checking start")
-        # polls server to see if ready to start
-        while True:
-            event = dict(self.poller.poll(1000))
-            if self.socket_should_start in event:
-                message = self.socket_should_start.recv_string()
-                print("message received for start status: %s" % message)
-            if message.startswith("start"):
-                self.should_start = True
-                print("START!!!", message)
-                break
-            else:
-                pass
-
-    def connect_registry(self):
-        #  connect to Registry Server
-        print("connecting to registry server at {} {}".format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
-        self.socket.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
-
     def connect_server(self):
         #  connect to Registry Server
-        print("connecting to registry server at {} {}".format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
+        print("connecting to registry server at {} {}\n".format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
         self.socket.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
 
         self.socket_should_start.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PUSH_PORT_NUMBER))
@@ -103,9 +142,10 @@ class Registry:
         # thread_registry.setDaemon(True)
         # thread_registry.start()
 
-        # thread_should_start = threading.Thread(target=self.get_start_status)
-        # thread_should_start.setDaemon(True)
-        # thread_should_start.start()
+    def get_watcher(self, path, callback):
+        watcher = Watcher(self.zk, self.role, path)
+        watcher.watch(callback)
+        return watcher
 
     def register(self, topics=None):
         print("in register method for topics: {} ".format(topics))
@@ -133,10 +173,21 @@ class Registry:
             if message:
                 print("registry response received for register service: %s" % message)
                 print("registered broker: {}".format(self.client))
+                self.get_watcher(constants.KAZOO_BROKER_PATH, None)
                 self.client.start()
         except Exception:
             print("must start Registry first!")
             raise
+
+    def pub_callback(self, path, data):
+        print("in pub callback...path: {} - data: {}".format(path, data))
+        if data is not None:
+            data = data.decode()
+            ip, port = data.split(":")
+            if constants.KAZOO_BROKER_PATH in path:
+                self.client.stop()
+                self.client.start(f"{ip}:{self.port}")
+        print(f"{path}-{data}\n")
 
     def register_publisher(self, topics):
         # send registration info to registry server
@@ -150,22 +201,21 @@ class Registry:
         if message:
             print("registry response received for register service: %s" % message)
             if self.strategy == constants.BROKER:
-                if self.socket.getsockopt(zmq.RCVMORE):
-                    print("receiving brokerIP")
-                    broker_ip = self.socket.recv_string(1)
-                    print("broker's ip: %s" % broker_ip)
-                else:
-                    broker_ip = self.get_broker_ip()
-
-                while not self.should_start:
-                    pass
-                self.client.start(broker_ip)
+                self.get_watcher(constants.KAZOO_BROKER_PATH, self.pub_callback)
             else:
-                while not self.should_start:
-                    pass
                 self.client.start()
         else:
             print("error - publisher not registered!")
+
+    def sub_callback(self, path, data):
+        print("in sub callback...")
+        if data is not None:
+            data = data.decode()
+            ip, port = data.split(":")
+
+            if constants.KAZOO_BROKER_PATH in path:
+                self.client.connect('tcp://{}:{}'.format(ip, self.port))
+        print(f"{path}-{data}\n")
 
     def register_subscriber(self, topics):
         registry = None
@@ -175,13 +225,13 @@ class Registry:
 
         self.socket.send_string('{} {} {} {}'.format(constants.REGISTER, self.role, self.address, self.port))
         message = self.socket.recv_string(0)
-        success, topo, pubs, subs, registries = message.split(" ")
-        # used only for data file name creation
-        if success == "success":
-            self.topo = topo
-            self.num_pubs = pubs
-            self.num_subs = subs
-            self.num_registries = registries
+        # success, topo, pubs, subs, registries = message.split(" ")
+        # # used only for data file name creation
+        # if success == "success":
+        #     self.topo = topo
+        #     self.num_pubs = pubs
+        #     self.num_subs = subs
+        #     self.num_registries = registries
 
         if message:
             print(message)
@@ -195,6 +245,10 @@ class Registry:
         print("REGISTRY:")
         print(registry)
 
+        if self.strategy == constants.BROKER:
+            print("Must start Broker App first!")
+            self.get_watcher(constants.KAZOO_BROKER_PATH, self.sub_callback)
+
         for topic in topics:
             if self.strategy == constants.DIRECT:
                 if topic in registry:
@@ -204,13 +258,8 @@ class Registry:
                         self.client.connect(connection)
                         self.client.subscribe(topic)
             elif self.strategy == constants.BROKER:
-                print("Must start Broker App first!")
-                broker_ip = self.get_broker_ip()
-                self.client.connect('tcp://{}:{}'.format(broker_ip, self.port))
                 self.client.subscribe(topic)
 
-        while not self.should_start:
-            pass
         self.client.start(self.num_pubs, self.num_subs, self.num_registries, self.strategy, self.topo)
 
     def get_topic_connection(self, topic):
