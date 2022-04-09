@@ -41,47 +41,21 @@ class Registry:
         self.zoo_client.join_election()
         self.zk = self.zoo_client.get_zk()
 
-        self.get_watcher(constants.KAZOO_REGISTRY_PATH, self.set_registry_ip)
-        # self.get_watcher(constants.KAZOO_REGISTRIES_PATH, self.get_registry_ip)
-        self.connect_server()
+        self.get_watcher(constants.KAZOO_REGISTRIES_PATH, self.get_registry_ip, True)
 
-    def set_registry_ip(self, path, data):
-        print("in registry callback...")
-        if data is not None:
-            data = data.decode()
-            ip, port = data.split(":")
-            if constants.KAZOO_REGISTRY_PATH in path:
-                self.serverIP = ip
-        print(f"{path}-{data}\n")
-
-    def get_registry_ip(self, path, data):
-        success = False
-        print("in registries callback...")
-        if data is not None:
-            print("DATA: {}".format(data))
-
-            data = data.decode()
-            addresses = data.split(",")
-            print(f"addresses: {addresses}")
-            address = random.choice(addresses)
-            print(f"address: {address}")
-            ip, port = address.split(":")
-
-            self.serverIP = ip
-            print(f"registry ip: {self.serverIP}")
-            while not success:
-                self.connect_server()
-                success = self.registry_heartbeat()
-                if not success and len(addresses) > 1:
-                    self.socket.disconnect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
-                    address_to_remove = "{}:{}".format(self.serverIP, port)
-                    addresses.remove(address_to_remove)
-                    address = random.choice(addresses)
-                    ip, port = address.split(":")
-                    self.serverIP = ip
-
-                print(success)
-        print(f"{path}-{data}\n")
+    def get_registry_ip(self, path, children):
+        if self.serverIP is None:
+            server_ip = random.choice(children).split(":")[0]
+            self.serverIP = server_ip
+            self.connect_server()
+        elif any(self.serverIP in child for child in children):
+            pass
+        else:
+            server_ip = random.choice(children).split(":")[0]
+            self.serverIP = server_ip
+            self.connect_server()
+        print("registries children: {}".format(children))
+        print("connected to new registry server at: {}".format(self.serverIP))
 
     def registry_heartbeat(self):
         self.socket.send_string("heartbeat")
@@ -94,7 +68,6 @@ class Registry:
                 print("RECEIVED HEARTBEAT!!!")
                 return True
         return False
-
 
     def get_new_registry_data(self, topics):
         registry_info = [constants.REGISTRY_NODES, constants.BROKER_IP, "start"]
@@ -135,16 +108,9 @@ class Registry:
         print("connecting to registry server at {} {}\n".format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
         self.socket.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
 
-        self.socket_should_start.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PUSH_PORT_NUMBER))
-        self.poller.register(self.socket_should_start, zmq.POLLIN)
-
-        # thread_registry = threading.Thread(target=self.connect_registry)
-        # thread_registry.setDaemon(True)
-        # thread_registry.start()
-
-    def get_watcher(self, path, callback):
+    def get_watcher(self, path, callback, watch_children=False):
         watcher = Watcher(self.zk, self.role, path)
-        watcher.watch(callback)
+        watcher.watch(callback, watch_children)
         return watcher
 
     def register(self, topics=None):

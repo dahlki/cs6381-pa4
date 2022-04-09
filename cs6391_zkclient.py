@@ -58,55 +58,17 @@ class ZooClient:
         self.election.register()
         self.zk_election = self.election.zk_election
 
-    # def register_pub_topics(self, topics=None):
-    #     if topics:
-    #         self.topics = topics
-    #     print("REGISTERING PUB TOPICS")
-    #     if self.role == constants.PUB:
-    #         path = "/pub"
-    #         if self.zk.exists(path):
-    #             print("{} znode indeed exists; get value".format(path))
-    #             value, stat = self.zk.get(path)
-    #             print(("Details of znode {}: value = {}, stat = {}".format(path, value, stat)))
-    #
-    #         else:
-    #             print("create node for: {}".format(path))
-    #             self.zk.create(path, sequence=True)
-    #
-    #         if self.topics:
-    #             print(f"registering pub topics: {self.topics}")
-    #             for topic in self.topics:
-    #                 topic_path = f"/pub/{topic}"
-    #                 if self.zk.exists(topic_path):
-    #                     value, stat = self.zk.get(topic_path)
-    #                     value = json.loads(value).append(self.address)
-    #                     self.zk.set(topic_path, json.dumps(value).encode())
-    #                 else:
-    #                     print("*******" + topic_path)
-    #                     address = [self.address]
-    #                     self.zk.create(topic_path, value=json.dumps(address).encode(), makepath=True, ephemeral=True)
-    #                 value, stat = self.zk.get(topic_path)
-    #                 print(("New value at znode {}: value = {}, stat = {}".format(topic_path, value, stat)))
-    #
-    # def register_registry(self, address):
-    #     print("REGISTERING REGISTRY")
-    #     path = "/registries"
-    #     if self.zk.exists(path):
-    #         print("{} znode indeed exists; get value".format(path))
-    #         value, stat = self.zk.get(path)
-    #         value = value.decode()
-    #         if len(value):
-    #             value += f",{address}"
-    #             self.zk.set(path, value.encode())
-    #         print(("Details of znode {}: value = {}, stat = {}".format(path, value, stat)))
-    #
-    #     else:
-    #         print("create node for: {}".format(path))
-    #         self.zk.create(path, value=address.encode(), makepath=True, ephemeral=True)
+    def register_registry(self, address):
+        print("REGISTERING REGISTRY")
+        path = "/registries"
+        registry_path = f"{path}/{address}"
+        if self.zk.exists(registry_path):
+            print("{} znode indeed exists; get value".format(path))
+            value = self.zk.get_children(path)
+            print(("Details of znode {}: value = {}".format(path, value)))
+            value = self.zk.get(registry_path)
+            print(("Details of znode {}: value = {}".format(path, value)))
 
-
-        # value, stat = self.zk.get(registry_path)
-        # print(("New value at znode {}: value = {}, stat = {}".format(registry_path, value, stat)))
-
-
-
+        else:
+            print("create node for: {}".format(registry_path))
+            self.zk.create(registry_path, value=address.encode(), makepath=True, ephemeral=True)

@@ -62,8 +62,7 @@ class RegistryServer:
 
         self.zoo_client = ZooClient(constants.REGISTRY, self.ip, constants.REGISTRY_PORT_NUMBER)
         self.zoo_client.join_election()
-        # self.zoo_client.register_registry(f"{self.ip}:{constants.REGISTRY_PORT_NUMBER}")
-        # self.watcher = Watcher(self.zoo_client, "registry", "/registries")
+        self.zoo_client.register_registry(f"{self.ip}:{constants.REGISTRY_PORT_NUMBER}")
 
     def broker_registration(self, address, port):
         self.helper.set_broker_ip(address)
@@ -96,8 +95,8 @@ class RegistryServer:
 
         print("start_receiving")
 
-        self.helper.set_registry("nodes", self.ip)
-        self.helper.set_registry_node(self.ip)
+        # self.helper.set_registry("nodes", self.ip)
+        # self.helper.set_registry_node(self.ip)
         if self.first_node:
             self.helper.set(constants.PUB_COUNT, self.pubs)
             self.helper.set(constants.SUB_COUNT, self.subs)
