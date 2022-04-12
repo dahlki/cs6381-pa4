@@ -124,10 +124,12 @@ class KademliaClient:
             # Create a Kademlia node
             self.kademlia_node = Server()
 
-            # Set the port that the node listens on
+            # if self.create:
+                # Set the port that the node listens on
             await self.kademlia_node.listen(self.kademlia_port)
-            # if not self.create:
-            # Provide a list of Kademlia hosts to bootstrap against
+            # else:
+            #     print(f"boostrapping: {self.kademlia_hosts}")
+                # Provide a list of Kademlia hosts to bootstrap against
             await self.kademlia_node.bootstrap(self.kademlia_hosts)
         except Exception as e:
             print(e, flush=True)
@@ -138,6 +140,6 @@ class KademliaClient:
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
         if debug:
-            self.logger.setLevel(logging.DEBUG)
+            self.logger.setLevel(logging.NOTSET)
         else:
             self.logger.setLevel(logging.WARNING)

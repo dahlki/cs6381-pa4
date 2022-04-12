@@ -6,7 +6,6 @@ import json
 import cs6381_constants as constants
 import time
 
-from cs6381_zkelection import Election
 from cs6381_zkwatcher import Watcher
 from cs6391_zkclient import ZooClient
 
@@ -17,11 +16,12 @@ class Registry:
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REQ)
         # self.socket.setsockopt(zmq.RCVTIMEO, 1000)  # set timeout of 1 seconds
-        self.socket_should_start = self.context.socket(zmq.SUB)
+        # self.socket_should_start = self.context.socket(zmq.SUB)
         self.socket_registry_data = self.context.socket(zmq.SUB)
         self.poller = zmq.Poller()
 
         self.role = role
+        self.topics = None
         self.address = address
         self.port = port
         self.strategy = strategy
@@ -35,6 +35,7 @@ class Registry:
         self.topo = None
 
         self.registry_ips = []
+        self.topic_thread = None
         self.lock = threading.Lock()
 
         self.zoo_client = ZooClient(role, self.address, self.port)
@@ -44,42 +45,33 @@ class Registry:
         self.get_watcher(constants.KAZOO_REGISTRIES_PATH, self.get_registry_ip, True)
 
     def get_registry_ip(self, path, children):
-        if self.serverIP is None:
-            server_ip = random.choice(children).split(":")[0]
-            self.serverIP = server_ip
-            self.connect_server()
-        elif any(self.serverIP in child for child in children):
-            pass
-        else:
-            server_ip = random.choice(children).split(":")[0]
-            self.serverIP = server_ip
-            self.connect_server()
+        if children:
+            if self.serverIP and any(self.serverIP in child for child in children):
+                print(f"registry client {self.role}, already connected to valide serber: {self.serverIP}")
+                pass
+            else:
+                server_ip = random.choice(children).split(":")[0]
+                self.serverIP = server_ip
+                self.connect_server()
+                if self.role == constants.SUB and self.topics:
+                    self.topic_thread.join()
+                    # thread = threading.Thread(target=self.get_new_registry_data, args=(self.topics,))
+                    # thread.setDaemon(True)
+                    self.topic_thread.start()
+        # elif self.serverIP:
+        #     self.disconnect_server()
+
         print("registries children: {}".format(children))
-        print("connected to new registry server at: {}".format(self.serverIP))
-
-    def registry_heartbeat(self):
-        self.socket.send_string("heartbeat")
-        events = dict(self.poller.poll(1000))
-
-        if self.socket in events and events[self.socket] == zmq.POLLIN:
-            message = self.socket.recv_string()
-
-            if message and message == "beat":
-                print("RECEIVED HEARTBEAT!!!")
-                return True
-        return False
 
     def get_new_registry_data(self, topics):
-        registry_info = [constants.REGISTRY_NODES, constants.BROKER_IP, "start"]
-        if topics is not None:
-            registry_info.extend(topics)
+        print("\nregistering SUB to new registry!!!!\n")
 
         self.socket_registry_data.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PUB_PORT_NUMBER))
         self.registry_ips.append(self.serverIP)
 
-        for meta_data in registry_info:
-            print("subscribing to: {}".format(meta_data))
-            self.socket_registry_data.setsockopt_string(zmq.SUBSCRIBE, meta_data)
+        for topic in topics:
+            print("subscribing to: {}".format(topic))
+            self.socket_registry_data.setsockopt_string(zmq.SUBSCRIBE, topic)
 
         self.poller.register(self.socket_registry_data, zmq.POLLIN)
         while True:
@@ -89,24 +81,20 @@ class Registry:
                 message = self.socket_registry_data.recv_string()
                 print("meta data message: ", message)
                 topic, connection = message.split(" ", 1)
-                if topic.startswith(constants.REGISTRY_NODES):
-                    connection = json.loads(connection)
-                    # print("registry client received META data for registry node:", connection)
-                    for ip in connection:
-                        if not(ip in self.registry_ips):
-                            print("new ip", topic, ip)
-                            self.socket_registry_data.connect('tcp://{}:{}'.format(ip, constants.REGISTRY_PUB_PORT_NUMBER))
-                            self.registry_ips.append(ip)
-                else:
-                    print("registry client received META data for topic:", topic, connection)
-                    if self.strategy == constants.DIRECT and connection.startswith("tcp"):
-                        self.client.connect(connection)
-                        self.client.subscribe(topic)
+                print("registry client received META data for topic:", topic, connection)
+                if self.strategy == constants.DIRECT and connection.startswith("tcp"):
+                    self.client.connect(connection)
+                    self.client.subscribe(topic)
 
     def connect_server(self):
         #  connect to Registry Server
         print("connecting to registry server at {} {}\n".format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
         self.socket.connect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
+
+    def disconnect_server(self):
+        #  connect to Registry Server
+        print("no registry available!\ndisconnecting to registry server at {} {}\n".format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
+        self.socket.disconnect('tcp://{}:{}'.format(self.serverIP, constants.REGISTRY_PORT_NUMBER))
 
     def get_watcher(self, path, callback, watch_children=False):
         watcher = Watcher(self.zk, self.role, path)
@@ -114,6 +102,7 @@ class Registry:
         return watcher
 
     def register(self, topics=None):
+        self.topics = topics
         print("in register method for topics: {} ".format(topics))
         if topics is None:
             topics = []
@@ -185,29 +174,27 @@ class Registry:
 
     def register_subscriber(self, topics):
         registry = None
-        thread = threading.Thread(target=self.get_new_registry_data, args=(topics,))
-        thread.setDaemon(True)
-        thread.start()
+        self.topic_thread = threading.Thread(target=self.get_new_registry_data, args=(topics,))
+        self.topic_thread.setDaemon(True)
+        self.topic_thread.start()
 
         self.socket.send_string('{} {} {} {}'.format(constants.REGISTER, self.role, self.address, self.port))
         message = self.socket.recv_string(0)
-        # success, topo, pubs, subs, registries = message.split(" ")
-        # # used only for data file name creation
-        # if success == "success":
-        #     self.topo = topo
-        #     self.num_pubs = pubs
-        #     self.num_subs = subs
-        #     self.num_registries = registries
+        print(f"register_subscriber message received: {message}")
+        success, topo, pubs, subs, registries = message.split(" ")
+        # used only for data file name creation
+        if success == "success":
+            self.topo = topo
+            self.num_pubs = pubs
+            self.num_subs = subs
+            self.num_registries = registries
 
         if message:
+            print("register_subscriber!!!!")
             print(message)
-            while registry is None or len(registry) <= 0:
+            while not registry:
                 registry = self.get_registry(constants.SUB)
-                if registry is not None and registry["nodes"]:
-                    self.registry_ips = registry["nodes"]
-                    for ip in self.registry_ips:
-                        self.socket_registry_data.connect('tcp://{}:{}'.format(ip, constants.REGISTRY_PUB_PORT_NUMBER))
-                time.sleep(2)
+                time.sleep(1)
         print("REGISTRY:")
         print(registry)
 
@@ -241,11 +228,4 @@ class Registry:
         message = self.socket.recv()
         return json.loads(message)
 
-    def get_broker_ip(self):
-        broker_ip = None
-        print("broker ip not received for broker dissemination strategy!")
-        while broker_ip is None:
-            broker_ip = self.get_topic_connection(constants.BROKER_IP)
-        print("broker's ip: %s" % broker_ip)
-        return broker_ip
 

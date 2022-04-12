@@ -21,7 +21,6 @@ class RegistryHelper:
         return None
 
     def set_broker_ip(self, ip):
-        print("setting broker ip: {}".format(ip))
         return self.set(constants.BROKER_IP, ip)
 
     def get_broker_ip(self):
