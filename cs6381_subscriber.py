@@ -60,7 +60,7 @@ class Subscriber(object):
     # where we want all publishers and subscribers deployed
     # before the publishers can start publishing.
     @abstractmethod
-    def start(self, num_pubs, num_subs, num_registries, strategy, topo):
+    def start(self, num_pubs, num_subs, num_brokers, num_registries, strategy, topo):
         pass
 
     @abstractmethod
@@ -92,7 +92,7 @@ class DirectSubscriber(Subscriber):
         print("DirectSubscriber subscribing to topic: ", topic)
         self.socket.setsockopt_string(zmq.SUBSCRIBE, topic)
 
-    def start(self, num_pubs, num_subs, num_registries, strategy, topo):
+    def start(self, num_pubs, num_subs, num_brokers, num_registries, strategy, topo):
         print("subscriber starting event loop")
         self.poller.register(self.socket, zmq.POLLIN)
         while self.iterations > 0:
@@ -104,7 +104,7 @@ class DirectSubscriber(Subscriber):
                 if topic in self.topics:
                     self.cb(data)
                 self.iterations -= 1
-        cs6381_util.write_to_csv(num_pubs, num_subs, num_registries, strategy, topo)
+        cs6381_util.write_to_csv(num_pubs, num_subs, num_brokers, num_registries, strategy, topo)
 
     def stop(self):
         self.socket.disconnect(self.connection)
@@ -129,7 +129,7 @@ class ViaBrokerSubscriber(Subscriber):
         print("ViaBrokerSubscriber subscribing to topic: ", topic)
         self.socket.setsockopt_string(zmq.SUBSCRIBE, topic)
 
-    def start(self, num_pubs, num_subs, num_registries, strategy, topo):
+    def start(self, num_pubs, num_subs, num_brokers, num_registries, strategy, topo):
         print("subscriber starting event loop")
         # cs6381_util.get_output()
         self.poller.register(self.socket, zmq.POLLIN)
@@ -144,7 +144,7 @@ class ViaBrokerSubscriber(Subscriber):
                 if topic in self.topics:
                     self.cb(data)
                 self.iterations -= 1
-        cs6381_util.write_to_csv(num_pubs, num_subs, num_registries, strategy, topo)
+        cs6381_util.write_to_csv(num_pubs, num_subs, num_brokers, num_registries, strategy, topo)
 
     def stop(self):
         self.socket.disconnect(self.connection)

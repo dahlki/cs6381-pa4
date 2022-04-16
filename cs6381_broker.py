@@ -58,7 +58,7 @@ class ViaBroker(Broker):
         # self.broker_watcher = Watcher(constants.BROKER, constants.KAZOO_BROKER_PATH, self.address, self.port)
         # self.watcher = self.broker_watcher.watch()
 
-        self.iterations = 50
+        self.iterations = None
 
     def start(self):
 
@@ -76,7 +76,7 @@ class ViaBroker(Broker):
         self.poller.register(self.xsub, zmq.POLLIN)
 
         print('ViaBroker starting')
-        while self.iterations > 0:
+        while self.iterations is None or self.iterations > 0:
             event = dict(self.poller.poll())
             if self.xpub in event:
                 msg = self.xpub.recv_multipart()
@@ -86,4 +86,5 @@ class ViaBroker(Broker):
                 msg = self.xsub.recv_multipart()
                 print("from publisher: %r" % msg)
                 self.xpub.send_multipart(msg)
-            self.iterations -= 1
+            if self.iterations:
+                self.iterations -= 1

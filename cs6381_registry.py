@@ -24,10 +24,12 @@ def parseCmdLineArgs():
                         help="number of publishers that need to register before dissemination begins")
     parser.add_argument("-s", "--subscribers", type=int, default=1,
                         help="number of subscribers that need to register before dissemination begins")
+    parser.add_argument("-b", "--brokers", type=int, default=1,
+                        help="number of brokers that need to register before dissemination begins")
     parser.add_argument("-r", "--registries", type=int, default=1,
                         help="number of registries; used for data collection info only")
-    # parser.add_argument("-c", "--create", default=False, action="store_true",
-    #                     help="Create a new DHT ring, otherwise we join a DHT")
+    parser.add_argument("-c", "--create", default=False, action="store_true",
+                        help="Create a new DHT ring, otherwise we join a DHT")
     parser.add_argument("-l", "--debug", default=logging.WARNING, action="store_true",
                         help="Logging level (see logging package): default WARNING else DEBUG")
     # parser.add_argument("-i", "--ipaddr", type=str, default=None, help="IP address of any existing DHT node")
@@ -40,7 +42,7 @@ def parseCmdLineArgs():
 
 class RegistryServer:
 
-    def __init__(self, topo, strategy, pubs=1, subs=1, registries=1):
+    def __init__(self, topo, strategy, pubs=1, subs=1, brokers=1, registries=1, create=False):
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REP)
         # self.socket_start_notification = self.context.socket(zmq.PUB)
@@ -49,14 +51,14 @@ class RegistryServer:
         self.kad_ipaddr = None
         self.kad_port = None
         self.strategy = strategy
-        self.broker = 1 if strategy == constants.BROKER else 0
+        self.brokers = brokers if strategy == constants.BROKER else 0
         self.pubs = pubs
         self.subs = subs
         self.registries = registries
         self.wait = True
         self.first_node = False
         self.debug = False
-        self.create = None
+        self.create = create
 
         self.kad_client = None
         self.helper = None
@@ -82,9 +84,9 @@ class RegistryServer:
         print(f"watcher in registry server - ChildrenWatch: {children}")
         if children:
             children_without_self = [child for child in children if self.ip not in child]
-            # print(f"children without self: {children_without_self}")
+            print(f"children without self: {children_without_self}")
             # children_without_self = children
-            if children_without_self:
+            if children_without_self and not self.create:
                 server_ip = random.choice(children_without_self).split(":")[0]
                 self.kad_ipaddr = server_ip
             else:
@@ -120,8 +122,9 @@ class RegistryServer:
         if self.first_node:
             self.helper.set(constants.PUB_COUNT, self.pubs)
             self.helper.set(constants.SUB_COUNT, self.subs)
-            self.helper.set(constants.BROKER_COUNT, self.broker)
-            self.helper.set("fileData", "{} {} {} {}".format(self.topo, self.pubs, self.subs, self.registries))
+            self.helper.set(constants.BROKER_COUNT, self.brokers)
+            print("setting filedata: {} {} {} {} {}".format(self.topo, self.pubs, self.subs, self.brokers, self.registries))
+            self.helper.set("fileData", "{} {} {} {} {}".format(self.topo, self.pubs, self.subs, self.brokers, self.registries))
 
         print("registry starting to receive requests")
         while True:
@@ -237,6 +240,7 @@ class RegistryServer:
         registry_pub_thread = threading.Thread(target=self.start_registry_data)
         registry_pub_thread.setDaemon(True)
 
+        print(f"registry {self.ip} connecting to kad registry {self.kad_ipaddr}")
         # self.create = args.create if self.create is None else self.create
         self.create_kad_client(self.create, self.kad_ipaddr, self.kad_port)
 
@@ -246,7 +250,9 @@ class RegistryServer:
 
 def main():
     args = parseCmdLineArgs()
-    registry = RegistryServer(args.topo, args.disseminate, args.publishers, args.subscribers, args.registries)
+    print(f"args {args}")
+    print(f"broker num: {args.brokers}")
+    registry = RegistryServer(args.topo, args.disseminate, args.publishers, args.subscribers, args.brokers, args.registries, args.create)
     registry.start(args)
 
 

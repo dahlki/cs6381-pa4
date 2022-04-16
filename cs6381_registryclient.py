@@ -31,6 +31,7 @@ class Registry:
 
         self.num_pubs = None
         self.num_subs = None
+        self.num_brokers = None
         self.num_registries = None
         self.topo = None
 
@@ -47,7 +48,7 @@ class Registry:
     def get_registry_ip(self, path, children):
         if children:
             if self.serverIP and any(self.serverIP in child for child in children):
-                print(f"registry client {self.role}, already connected to valide serber: {self.serverIP}")
+                print(f"registry client {self.role}, already connected to valid server: {self.serverIP}")
                 pass
             else:
                 server_ip = random.choice(children).split(":")[0]
@@ -128,7 +129,7 @@ class Registry:
             if message:
                 print("registry response received for register service: %s" % message)
                 print("registered broker: {}".format(self.client))
-                self.get_watcher(constants.KAZOO_BROKER_PATH, None)
+                # self.get_watcher(constants.KAZOO_BROKER_PATH, None)
                 self.client.start()
         except Exception:
             print("must start Registry first!")
@@ -181,12 +182,13 @@ class Registry:
         self.socket.send_string('{} {} {} {}'.format(constants.REGISTER, self.role, self.address, self.port))
         message = self.socket.recv_string(0)
         print(f"register_subscriber message received: {message}")
-        success, topo, pubs, subs, registries = message.split(" ")
+        success, topo, pubs, subs, brokers, registries = message.split(" ")
         # used only for data file name creation
         if success == "success":
             self.topo = topo
             self.num_pubs = pubs
             self.num_subs = subs
+            self.num_brokers = brokers
             self.num_registries = registries
 
         if message:
@@ -213,7 +215,7 @@ class Registry:
             elif self.strategy == constants.BROKER:
                 self.client.subscribe(topic)
 
-        self.client.start(self.num_pubs, self.num_subs, self.num_registries, self.strategy, self.topo)
+        self.client.start(self.num_pubs, self.num_subs, self.num_brokers, self.num_registries, self.strategy, self.topo)
 
     def get_topic_connection(self, topic):
         self.socket.send_string('{} {}'.format(constants.DISCOVER, topic))

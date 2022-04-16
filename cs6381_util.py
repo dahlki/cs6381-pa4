@@ -31,7 +31,7 @@ def get_time_difference(start, end):
 
 header = ['topic', 'pub_id', 'sub_id', 'time_difference', 'pub_timestamp', 'sub_timestamp']
 data = []
-header_averages = ["pubs/subs", "registries", "average", "sub messages"]
+header_averages = ["pubs/subs", "brokers", "registries", "average", "sub messages"]
 average = []
 
 
@@ -61,12 +61,12 @@ def get_subscribe_message(message, sub_ip, uuid):
 
 
 # results/2-1-2-broker-linear/2-1-2-broker-linear.csv
-csv_file = "results/{}-{}-{}-{}-{}/{}-{}-{}-{}-{}.csv"
+csv_file = "results/{}-{}-{}-{}-{}-{}/{}-{}-{}-{}-{}-{}.csv"
 
 
 # get subscriber data from local and write to csv file
-def write_to_csv(num_pubs, num_subs, num_registries, strategy, topo):
-    file = csv_file.format(num_pubs, num_subs, num_registries, strategy, topo, num_pubs, num_subs, num_registries, strategy, topo)
+def write_to_csv(num_pubs, num_subs, num_brokers, num_registries, strategy, topo):
+    file = csv_file.format(num_pubs, num_subs, num_brokers, num_registries, strategy, topo, num_pubs, num_subs, num_brokers, num_registries, strategy, topo)
     print("writing data to:", file)
     sorted_data = sorted(data, key=lambda row: (row[4]), reverse=False)  # sorted by time sent by pub
     for d in sorted_data:
@@ -82,14 +82,14 @@ def write_to_csv(num_pubs, num_subs, num_registries, strategy, topo):
     if csv_exists(file):
         append_data_row(file, sorted_data)
     else:
-        os.makedirs("results/{}-{}-{}-{}-{}".format(num_pubs, num_subs, num_registries, strategy, topo), exist_ok=True)
+        os.makedirs("results/{}-{}-{}-{}-{}-{}".format(num_pubs, num_subs, num_brokers, num_registries, strategy, topo), exist_ok=True)
         with open(file, "w", encoding="UTF8", newline='') as f:
             writer = csv.writer(f)
             writer.writerow(header)
             writer.writerows(sorted_data)
 
-    averages(new_data_entry_length, num_pubs, num_subs, num_registries, strategy, topo)
-    total_average(file, num_pubs, num_subs, num_registries, strategy, topo)
+    averages(new_data_entry_length, num_pubs, num_subs, num_brokers, num_registries, strategy, topo)
+    total_average(file, num_pubs, num_subs, num_brokers, num_registries, strategy, topo)
 
 
 def append_data_row(file, rows):
@@ -128,9 +128,9 @@ def csv_exists(path):
     return os.path.exists(path)
 
 
-def averages(new_data_count, num_pubs, num_subs, num_registries, strategy, topo):
-    filepath_averages = "results/{}-{}-{}-{}-{}/averages_{}_{}.csv".format(num_pubs, num_subs, num_registries, strategy, topo, strategy, topo)
-    csv_data = pd.read_csv(csv_file.format(num_pubs, num_subs, num_registries, strategy, topo, num_pubs, num_subs, num_registries, strategy, topo))
+def averages(new_data_count, num_pubs, num_subs, num_brokers, num_registries, strategy, topo):
+    filepath_averages = "results/{}-{}-{}-{}-{}-{}/averages_{}_{}.csv".format(num_pubs, num_subs, num_brokers, num_registries, strategy, topo, strategy, topo)
+    csv_data = pd.read_csv(csv_file.format(num_pubs, num_subs, num_brokers, num_registries, strategy, topo, num_pubs, num_subs, num_brokers, num_registries, strategy, topo))
     new_data = csv_data.tail(new_data_count)
     print("averaging {} rows".format(new_data_count))
 
@@ -141,9 +141,9 @@ def averages(new_data_count, num_pubs, num_subs, num_registries, strategy, topo)
 
     average_time_delay = new_data["time_difference"].mean().round(8)
 
-    average_row = ["{}/{}".format(num_pubs, num_subs), "{}".format(num_registries), average_time_delay, len(new_data)]
+    average_row = ["{}/{}".format(num_pubs, num_subs), "{}".format(num_brokers), "{}".format(num_registries), average_time_delay, len(new_data)]
     average.append(average_row)
-    print("average for {} pubs, {} subs, {} registries: {}".format(num_pubs, num_subs, num_registries, average_row))
+    print("average for {} pubs, {} subs, {} brokers, {} registries: {}".format(num_pubs, num_subs, num_brokers, num_registries, average_row))
 
     if csv_exists(filepath_averages):
         append_data_row(filepath_averages, average)
@@ -155,8 +155,8 @@ def averages(new_data_count, num_pubs, num_subs, num_registries, strategy, topo)
             writer.writerows(average)
 
 
-def total_average(csv_data_file, num_pubs, num_subs, num_registries, strategy, topo):
-    filepath_total_average = "results/{}-{}-{}-{}-{}/total_average_{}-{}-{}_{}_{}.csv".format(num_pubs, num_subs, num_registries, strategy, topo, num_pubs, num_subs, num_registries, strategy, topo)
+def total_average(csv_data_file, num_pubs, num_subs,  num_brokers,num_registries, strategy, topo):
+    filepath_total_average = "results/{}-{}-{}-{}-{}-{}/total_average_{}-{}-{}-{}_{}_{}.csv".format(num_pubs, num_subs, num_brokers, num_registries, strategy, topo, num_pubs, num_subs, num_brokers, num_registries, strategy, topo)
     csv_data = pd.read_csv(csv_data_file)
     average_time_delay = csv_data["time_difference"].mean().round(8)
     csv_length = len(csv_data)
@@ -164,7 +164,7 @@ def total_average(csv_data_file, num_pubs, num_subs, num_registries, strategy, t
     # time = csv_data.iloc[0, 3]
     # print("first row time delay: {}".format(time))
 
-    total_average_row = [["{}/{}".format(num_pubs, num_subs), "{}".format(num_registries), average_time_delay, csv_length]]
+    total_average_row = [["{}/{}".format(num_pubs, num_subs), "{}".format(num_brokers), "{}".format(num_registries), average_time_delay, csv_length]]
 
     if csv_exists(filepath_total_average):
         append_data_row(filepath_total_average, total_average_row)

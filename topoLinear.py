@@ -2,6 +2,7 @@
 # print(sys.path)
 import random
 
+from mininet.cli import CLI
 from mininet.net import Mininet
 from mininet.topolib import TreeNet
 from mininet.topo import Topo
@@ -22,16 +23,18 @@ def parseCmdLineArgs():
     parser.add_argument("-p", "--publishers", type=int, default=1, help="number of publishers")
     parser.add_argument("-s", "--subscribers", type=int, default=1, help="number of subscribers")
     parser.add_argument("-r", "--registries", type=int, default=1, help="number of registries")
+    parser.add_argument("-b", "--brokers", type=int, default=1, help="number of brokers")
     parser.add_argument("-n", "--hosts", type=int, default=2, help="number of hosts per switch; default 1")
     parser.add_argument("-k", "--switches", type=int, default=10, help="number of switches; default 10")
-    parser.add_argument("-t", "--time", type=int, default=20,
-                        help="seconds the program will run before shutting down; default 20")
+    parser.add_argument("-t", "--time", type=int, default=60,
+                        help="seconds the program will run before shutting down; default 60")
 
     return parser.parse_args()
 
 
-def start_linear_topology(host_num=1, switches=10, strategy="direct", num_pubs=1, num_subs=1, num_registries=1,
+def start_linear_topology(host_num=1, switches=10, strategy="direct", num_pubs=1, num_subs=1, num_brokers=1, num_registries=1,
                           time_to_run=20):
+    num_brokers = num_brokers if strategy == "broker" else 0
     hosts = []
     registry_hosts = []
     created_registry_hosts = []
@@ -44,7 +47,7 @@ def start_linear_topology(host_num=1, switches=10, strategy="direct", num_pubs=1
     cleanup()
     net = Mininet(LinearTopo(k=switches, n=host_num))
     net.start()
-    # time.sleep(1)
+    time.sleep(1)
 
     # print(net.hosts)
 
@@ -63,18 +66,25 @@ def start_linear_topology(host_num=1, switches=10, strategy="direct", num_pubs=1
         registry_hosts.append({host_ip: h})
 
     timestamp = cs6381_util.get_timestamp().strftime("%Y-%m-%d %H:%M:%S")
+    zk_server_host = net.hosts[0]
+
+    zk_server_host.cmd(["kafka_2.13-3.1.0/bin/zookeeper-server-start.sh kafka_2.13-3.1.0/config/zookeeper.properties &> 'results/logs/{}-{}-{}-{}-{}-tree-zookeeper-{}-{}.log' &".format(
+                               num_pubs, num_subs, num_brokers, num_registries, strategy, zk_server_host.name,
+                               timestamp)])
+
+    time.sleep(5)
 
     # run registry
     for count, h in enumerate(registry_hosts):
         def registry_startup_create(registry):
-            registry_cmd = "python3 -u cs6381_registry.py -c -p {} -s {} -r {} -d {} -t linear &> 'results/logs/{}-{}-{}-{}-linear-registry-{}-{}.log' &".format(
-                num_pubs, num_subs, num_registries, strategy, num_pubs, num_subs, num_registries, strategy, registry.name, timestamp)
+            registry_cmd = "python3 -u cs6381_registry.py -c -p {} -s {} -b {} -r {} -d {} -t linear &> 'results/logs/{}-{}-{}-{}-{}-linear-registry-{}-{}.log' &".format(
+                num_pubs, num_subs, num_brokers, num_registries, strategy, num_pubs, num_subs, num_brokers, num_registries, strategy, registry.name, timestamp)
             registry.cmd(registry_cmd)
 
         def registry_startup(registry):
             existing_registry = random.choice(created_registry_hosts)
-            registry_cmd = "python3 -u cs6381_registry.py -i {} -p {} -s {} -r {} -d {} -t linear &> 'results/logs/{}-{}-{}-{}-linear-registry-{}-{}.log' &".format(
-                existing_registry, num_pubs, num_subs, num_registries, strategy, num_pubs, num_subs, num_registries, strategy, registry.name, timestamp)
+            registry_cmd = "python3 -u cs6381_registry.py -p {} -s {} -b {} -r {} -d {} -t linear &> 'results/logs/{}-{}-{}-{}-{}-linear-registry-{}-{}.log' &".format(
+                num_pubs, num_subs, num_brokers, num_registries, strategy, num_pubs, num_subs, num_brokers, num_registries, strategy, registry.name, timestamp)
             registry.cmd(registry_cmd)
 
         [[host_ip, registry_host]] = h.items()
@@ -85,25 +95,30 @@ def start_linear_topology(host_num=1, switches=10, strategy="direct", num_pubs=1
         created_registry_hosts.append(host_ip)
         time.sleep(1)
 
+    time.sleep(5)
+
     # run broker if dissemination strategy is broker
     if strategy == "broker":
-        def broker_startup(registry):
-            broker_host = hosts.pop()
-            print("broker: {}, connecting to registry: {}".format(broker_host.name, registry))
-            brokerapp_cmd = "python3 -u brokerapp.py -i {} &> 'results/logs/{}-{}-{}-{}-linear-broker-{}-{}.log' &".format(registry, num_pubs, num_subs, num_registries, strategy,
-                                                                                                broker_host.name, timestamp)
-            broker_host.cmd(brokerapp_cmd)
+        for _ in itertools.repeat(None, num_brokers):
+            def broker_startup(registry):
+                broker_host = hosts.pop()
+                print("broker: {}, connecting to registry: {}".format(broker_host.name, registry))
+                brokerapp_cmd = "python3 -u brokerapp.py &> 'results/logs/{}-{}-{}-{}-{}-linear-broker-{}-{}.log' &".format(num_pubs, num_subs, num_brokers, num_registries, strategy,
+                                                                                                    broker_host.name, timestamp)
+                broker_host.cmd(brokerapp_cmd)
 
-        random_registry_host = random.choice(created_registry_hosts)
-        broker_startup(random_registry_host)
-        time.sleep(1)
+            random_registry_host = random.choice(created_registry_hosts)
+            broker_startup(random_registry_host)
+            time.sleep(1)
+
+    time.sleep(5)
 
     # run pubs
     for _ in itertools.repeat(None, num_pubs):
         def pub_startup(registry):
             pub_host = hosts.pop()
             print("pub: {}, connecting to registry: {}".format(pub_host.name, registry))
-            pubapp_cmd = "python3 -u pubapp.py -d {} -i {} &> 'results/logs/{}-{}-{}-{}-linear-pub-{}-{}.log' &".format(strategy, registry, num_pubs, num_subs, num_registries, strategy,
+            pubapp_cmd = "python3 -u pubapp.py -d {} -i {} &> 'results/logs/{}-{}-{}-{}-{}-linear-pub-{}-{}.log' &".format(strategy, registry, num_pubs, num_subs, num_brokers, num_registries, strategy,
                                                                                              pub_host.name, timestamp)
             pub_host.cmd(pubapp_cmd)
 
@@ -111,12 +126,14 @@ def start_linear_topology(host_num=1, switches=10, strategy="direct", num_pubs=1
         pub_startup(random_registry_host)
         time.sleep(1)
 
+    time.sleep(2)
+
     # run subs
     for i in range(num_subs):
         def sub_startup(registry):
             sub_host = hosts.pop()
             print("sub: {}, connecting to registry: {}".format(sub_host.name, registry))
-            subapp_cmd = "python3 -u subapp.py -d {} -i {} &> 'results/logs/{}-{}-{}-{}-linear-sub-{}-{}.log' &".format(strategy, registry, num_pubs, num_subs, num_registries, strategy,
+            subapp_cmd = "python3 -u subapp.py -d {} -i {} &> 'results/logs/{}-{}-{}-{}-{}-linear-sub-{}-{}.log' &".format(strategy, registry, num_pubs, num_subs, num_brokers, num_registries, strategy,
                                                                                              sub_host.name, timestamp)
             sub_host.cmd(subapp_cmd)
 
@@ -124,6 +141,7 @@ def start_linear_topology(host_num=1, switches=10, strategy="direct", num_pubs=1
         sub_startup(random_registry_host)
         time.sleep(1)
 
+    # CLI(net)
     # give time for subs to get messages
     time.sleep(time_to_run)
     net.stop()
@@ -155,9 +173,10 @@ def main():
     num_subs = args.subscribers
     time_to_run = args.time
     num_registries = args.registries
+    num_brokers = args.brokers
 
     try:
-        start_linear_topology(hosts, switches, strategy, num_pubs, num_subs, num_registries, time_to_run)
+        start_linear_topology(hosts, switches, strategy, num_pubs, num_subs, num_brokers, num_registries, time_to_run)
     except KeyboardInterrupt:
         pass
 

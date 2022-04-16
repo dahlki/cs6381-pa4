@@ -21,7 +21,8 @@ class Plot:
 
     def plot(self):
 
-        is_registry_plot = "regs" in self.csv_filepath
+        is_registry_plot = "regs" in self.csv_filepath or "brokers" in self.csv_filepath
+        print(f"is registry or broker plot: {is_registry_plot}")
 
         csv_data = pd.read_csv(self.csv_filepath)
         df = pd.DataFrame(csv_data)
@@ -45,7 +46,7 @@ class Plot:
                 else:
                     self.x.append(row[1])
                     x = [1, 2, 4, 6, 8, 10]
-                self.y.append(float(row[2]))
+                self.y.append(float(row[3]))
         print(self.x)
         print(self.y)
 
@@ -61,7 +62,7 @@ class Plot:
         if not is_registry_plot:
             plt.xlabel('pubs/subs')
         else:
-            plt.xlabel('registries')
+            plt.xlabel('brokers')
         plt.ylabel('delay in seconds')
         plt.title(self.title, fontsize=20)
         plt.grid()
