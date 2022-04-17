@@ -15,8 +15,6 @@ class Registry:
     def __init__(self, role, address="localhost", port=None, strategy=None, client=None, registry_ip="10.0.0.1"):
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REQ)
-        # self.socket.setsockopt(zmq.RCVTIMEO, 1000)  # set timeout of 1 seconds
-        # self.socket_should_start = self.context.socket(zmq.SUB)
         self.socket_registry_data = self.context.socket(zmq.SUB)
         self.poller = zmq.Poller()
 
@@ -51,17 +49,13 @@ class Registry:
                 print(f"registry client {self.role}, already connected to valid server: {self.serverIP}")
                 pass
             else:
-                server_ip = random.choice(children).split(":")[0]
-                self.serverIP = server_ip
-                self.connect_server()
-                if self.role == constants.SUB and self.topics:
-                    self.topic_thread.join()
-                    # thread = threading.Thread(target=self.get_new_registry_data, args=(self.topics,))
-                    # thread.setDaemon(True)
-                    self.topic_thread.start()
-        # elif self.serverIP:
-        #     self.disconnect_server()
-
+                # server_ip = random.choice(children).split(":")[0]
+                for server_ip in children:
+                    server_ip = server_ip.split(":")[0]
+                    self.serverIP = server_ip
+                    self.connect_server()
+                    if self.role == constants.SUB and self.topics:
+                        self.socket_registry_data.connect('tcp://{}:{}'.format(server_ip, constants.REGISTRY_PUB_PORT_NUMBER))
         print("registries children: {}".format(children))
 
     def get_new_registry_data(self, topics):
@@ -129,7 +123,7 @@ class Registry:
             if message:
                 print("registry response received for register service: %s" % message)
                 print("registered broker: {}".format(self.client))
-                # self.get_watcher(constants.KAZOO_BROKER_PATH, None)
+                self.get_watcher(constants.KAZOO_BROKER_PATH, None)
                 self.client.start()
         except Exception:
             print("must start Registry first!")
@@ -182,14 +176,17 @@ class Registry:
         self.socket.send_string('{} {} {} {}'.format(constants.REGISTER, self.role, self.address, self.port))
         message = self.socket.recv_string(0)
         print(f"register_subscriber message received: {message}")
-        success, topo, pubs, subs, brokers, registries = message.split(" ")
+        success, *meta_data = message.split(" ")
+        print(meta_data[0])
+        if meta_data[0] != 'None':
+            topo, pubs, subs, brokers, registries = meta_data
         # used only for data file name creation
-        if success == "success":
-            self.topo = topo
-            self.num_pubs = pubs
-            self.num_subs = subs
-            self.num_brokers = brokers
-            self.num_registries = registries
+            if success == "success":
+                self.topo = topo
+                self.num_pubs = pubs
+                self.num_subs = subs
+                self.num_brokers = brokers
+                self.num_registries = registries
 
         if message:
             print("register_subscriber!!!!")

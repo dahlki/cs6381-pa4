@@ -7,9 +7,9 @@ sudo python3 topoLinear.py -d broker -p 1 -s 3 -r 1 -t 100
 sudo mn -c
 sudo python3 topoLinear.py -d broker -p 1 -s 4 -r 1 -t 100
 sudo mn -c
-sudo python3 topoLinear.py -d broker -p 1 -s 5 -r 1 -t 100
+sudo python3 topoLinear.py -d broker -p 1 -s 6 -r 1 -t 100
 sudo mn -c
-sudo python3 topoLinear.py -d broker -p 1 -s 10 -r 1 -t 200
+sudo python3 topoLinear.py -d broker -p 1 -s 8 -r 1 -t 200
 sudo mn -c
-sudo python3 topoLinear.py -d broker -p 1 -s 20 -r 1 -t 200 -k 12
+sudo python3 topoLinear.py -d broker -p 1 -s 10 -r 1 -t 200 -k 12
 sudo mn -c

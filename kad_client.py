@@ -140,6 +140,6 @@ class KademliaClient:
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
         if debug:
-            self.logger.setLevel(logging.NOTSET)
+            self.logger.setLevel(logging.DEBUG)
         else:
             self.logger.setLevel(logging.WARNING)

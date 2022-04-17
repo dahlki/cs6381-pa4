@@ -56,7 +56,7 @@ class RegistryServer:
         self.subs = subs
         self.registries = registries
         self.wait = True
-        self.first_node = False
+        self.first_node = create
         self.debug = False
         self.create = create
 
@@ -89,8 +89,8 @@ class RegistryServer:
             if children_without_self and not self.create:
                 server_ip = random.choice(children_without_self).split(":")[0]
                 self.kad_ipaddr = server_ip
-            else:
-                self.create = True
+            # else:
+            #     self.create = True
 
         print("registries children: {}".format(children))
         print("kad_ipaddr: {}".format(self.kad_ipaddr))
@@ -118,7 +118,6 @@ class RegistryServer:
     def start_receiving(self):
         self.socket.bind('tcp://*:{}'.format(constants.REGISTRY_PORT_NUMBER))
 
-        print("start_receiving")
         if self.first_node:
             self.helper.set(constants.PUB_COUNT, self.pubs)
             self.helper.set(constants.SUB_COUNT, self.subs)
@@ -199,7 +198,7 @@ class RegistryServer:
             for topic in topics:
                 topic_connection = "%s %s" % (topic, connection)
                 print(f"NEW PUB TOPIC: {topic}")
-                # is_new_topic = self.helper.set_topic_index(topic_connection)
+                is_new_topic = self.helper.set_topic_index(topic_connection)
                 # if is_new_topic:
                 print("NOTIFYING SUBSCRIBERS OF NEW PUB FOR TOPIC: {} on registry node {}".format(topic_connection, self.ip))
                 self.socket_registry_data.send_string(topic_connection)

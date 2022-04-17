@@ -15,7 +15,7 @@ class Data:
         self.topo = topo
         self.dissemination = dissemination
         self.files = []
-        self.nums = [1, 2, 3, 4, 5, 10, 20]
+        self.nums = [1, 2, 3, 4, 6, 8, 10]
         self.reg_nums = [1, 2, 4, 6, 8, 10]
         self.brokers_nums = [1, 2, 4, 6, 8, 10]
         self.headers = ["pubs/subs", "brokers", "registries", "average", "sub messages"]
