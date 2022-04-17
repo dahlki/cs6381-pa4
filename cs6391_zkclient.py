@@ -29,16 +29,6 @@ class ZooClient:
         self.zk_election = None
         self.election = None
 
-        # self.zk.delete(path="/registries0000000235", recursive=True)
-        # self.zk.delete(path="/pub", recursive=True)
-        # self.zk.delete(path="/pub-election", recursive=True)
-        # self.zk.delete(path="/sub", recursive=True)
-        # self.zk.delete(path="/sub-election", recursive=True)
-        # self.zk.delete(path="/broker", recursive=True)
-        # self.zk.delete(path="/registry", recursive=True)
-        # self.zk.delete(path="/registry-election", recursive=True)
-        # self.zk.delete(path="/broker-election", recursive=True)
-
     @staticmethod
     def listener_state(state):
         if state == KazooState.LOST:
