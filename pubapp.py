@@ -90,6 +90,7 @@ def parseCmdLineArgs():
     parser.add_argument("-t", "--time", type=float, default=.05,
                         help="specify seconds between publishing messages; default is 0.05")
     parser.add_argument("-i", "--registryIP", type=str, help="IP address of any existing Registry node")
+    parser.add_argument("-m", "--history", type=int, choices=range(0, 20), default=0, help="max number of history messages; range from 0 - 20; default = 0")
 
 
     return parser.parse_args()
@@ -126,7 +127,7 @@ async def main():
 
     # get a handle to our broker object (will be a proxy)
     registry = Registry(constants.PUB, ip, args.port, args.disseminate, pub, args.registryIP)
-    registry.register(my_topics)
+    registry.register(my_topics, args.history)
     # wait for kickstart event from broker
     # now do the publication for as many iterations that we plan to do
     print("pubapp publishing...")

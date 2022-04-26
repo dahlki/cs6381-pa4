@@ -23,9 +23,10 @@ import random
 class TopicList:
     # some pre-defined topics from which a publisher or subscriber chooses
     # from
-    topiclist = ["weather", "humidity", "airquality", "light",
-                 "pressure", "temperature", "sound", "altitude",
-                 "location"]
+    # topiclist = ["weather", "humidity", "airquality", "light",
+    #              "pressure", "temperature", "sound", "altitude",
+    #              "location"]
+    topiclist = ["weather"]
 
     # return a random subset of topics from this list, which becomes our interest
     # A publisher or subscriber application logic will invoke this method

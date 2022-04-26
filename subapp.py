@@ -72,6 +72,7 @@ def parseCmdLineArgs ():
     parser.add_argument("-n", "--number", type=int, choices=range(1, 9), default=None,
                         help="number of topics to publish; between 1 and 8")
     parser.add_argument("-i", "--registryIP", type=str, help="IP address of any existing Registry node")
+    parser.add_argument("-m", "--history", type=int, choices=range(0, 20), default=0, help="number of history messages wanted; range from 1 - 20")
 
     return parser.parse_args()
 
@@ -94,7 +95,7 @@ async def main():
     sub.notify(my_topics, lambda x: print("app notify - {} \n".format(x)))
 
     registry = Registry(constants.SUB, ip, args.port, args.disseminate, sub, args.registryIP)
-    registry.register(my_topics)
+    registry.register(my_topics, args.history)
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ from cs6381_zkwatcher import Watcher
 class Election:
     def __init__(self, zk, role, ip, port, **kwargs):
         self.__dict__.update(kwargs)
-        print("**election kwargs: {}".format(self.__dict__))
+        # print("**election kwargs: {}".format(self.__dict__))
         self.role = role
         self.ip = ip
         self.port = port
@@ -17,6 +17,7 @@ class Election:
 
         self.path = "/{}".format(role)
         self.elected_path = "/{}-election".format(role)
+        self.primary = "/primary-{}".format(role)
 
         self.address = '{}:{}'.format(ip, port)
 
@@ -32,7 +33,7 @@ class Election:
         if self.zk.exists(self.elected_path):
             print("{} znode indeed exists; get value".format(self.elected_path))
             value, stat = self.zk.get(self.elected_path)
-            print(("Details of znode {}: value = {}, stat = {}".format(self.elected_path, value, stat)))
+            # print(("Details of znode {}: value = {}, stat = {}".format(self.elected_path, value, stat)))
 
         else:
             print("create node for: {}".format(self.elected_path))
@@ -46,13 +47,30 @@ class Election:
         print(f"\n{self.role} leader elected!")
         children = self.zk.get_children("/")
         print(f"\nchildren nodes: {children}")
+        print(f"contenders: {self.zk_election.contenders()}")
         # if self.zk.exists("/registries"):
         #     children_children = self.zk.get_children("/registries")
         #     print(f"\nchildren nodes: {children_children}")
-        watcher = Watcher(self.zk, self.role, self.path, self.ip, self.port)
+        watcher = Watcher(self.zk, self.role, self.path, f"{self.ip}:{self.port}")
         watcher.watch(self.default_callback)
 
     def default_callback(self, path, data):
-        print(f"in election callback, path: {path} data: {data}")
+        print(f"in election default callback, path: {path} data: {data}")
 
+    # def load_balancer_election_callback(self, path, data):
+    #     print(f"ELECTION WATCH callback - load_balancer_election_callback, role: {self.role}, path: {path} data: {data}")
+    #     if data is not None:
+    #         self.primary = data.decode()
+    #     print(f"PRIMARY: {self.primary}")
+    #     # if self.zk.exists(self.elected_path):
+    #     #     print(f"elected_path: {self.zk.get(self.elected_path)}")
+    #     if self.zk.exists("/brokers"):
+    #         path = "/brokers"
+    #         brokers = self.zk.get_children(path)
+    #         print(f"brokers path: {brokers}")
+    #         if brokers:
+    #             backup_brokers = [broker for broker in brokers if self.primary not in broker]
+    #             print(f"backup brokers: {backup_brokers}")
+    #
+    #     print("END ELECTION WATCH callback - load_balancer_election_callback\n\n")
 

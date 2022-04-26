@@ -52,12 +52,6 @@ class ViaBroker(Broker):
         self.xpub = self.context.socket(zmq.XPUB)
         self.xsub = self.context.socket(zmq.XSUB)
 
-        # self.election = Election(constants.BROKER, get_system_address(), self.port)
-        # self.election.register()
-        #
-        # self.broker_watcher = Watcher(constants.BROKER, constants.KAZOO_BROKER_PATH, self.address, self.port)
-        # self.watcher = self.broker_watcher.watch()
-
         self.iterations = None
 
     def start(self):
@@ -84,6 +78,12 @@ class ViaBroker(Broker):
                 self.xsub.send_multipart(msg)
             if self.xsub in event:
                 msg = self.xsub.recv_multipart()
+                print("from publisher: %r" % msg)
+
+                decode_msg = msg[0].decode()
+                topic = decode_msg.split(' ')[0]
+                print(topic)
+                # if MetaData().get_topic_address(topic) in decode_msg:
                 print("from publisher: %r" % msg)
                 self.xpub.send_multipart(msg)
             if self.iterations:

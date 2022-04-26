@@ -38,6 +38,7 @@ def parseCmdLineArgs():
     # parser.add_argument("-a", "--ipaddr", type=str, default='localhost', help="address")
     parser.add_argument("-p", "--port", type=int, default=ports.BROKER_PORT_NUMBER, help="port number")
     parser.add_argument("-i", "--registryIP", type=str, help="IP address of any existing Registry node")
+    parser.add_argument("-r", "--replicas", type=int, default=1, help="number of backup replicas for load balancing")
 
     return parser.parse_args()
 
@@ -50,8 +51,8 @@ async def main():
     config = Configurator(args, ip)
 
     broker = config.get_broker()
-
-    registry = Registry("broker", ip, args.port, args.disseminate, broker, args.registryIP)
+    print("REPLICAS: {}".format(args.replicas))
+    registry = Registry("broker", ip, args.port, args.disseminate, broker, args.registryIP, args.replicas)
     registry.register()
 
 

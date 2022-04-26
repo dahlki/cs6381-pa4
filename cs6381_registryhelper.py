@@ -104,7 +104,7 @@ class RegistryHelper:
 
     def set_registry(self, topic, connection):
         current_registry = self.get_registry()
-        print("CURRENT_REGISTRY", current_registry)
+        print(f"CURRENT_REGISTRY: {current_registry}")
 
         registry = self.serialize_object(current_registry, topic, connection)
         self.kademlia_client.set("registry", registry)

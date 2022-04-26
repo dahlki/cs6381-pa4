@@ -19,15 +19,10 @@
 # is able to produce when asked by the caller
 from cs6381_topiclist import TopicList
 from cs6381_publisher import Publisher
-from cs6381_pubproxy import *
 from cs6381_subscriber import Subscriber
 # from cs6381_subproxy import SubscriberProxy
 from cs6381_broker import Broker
-from cs6381_brokerproxy import BrokerProxy
-import array
-import struct
-import socket
-import fcntl
+
 
 SIOCGIFCONF = 0x8912  # define SIOCGIFCONF
 BYTES = 4096

@@ -21,7 +21,7 @@ import zmq
 import cs6381_util
 from cs6381_zkwatcher import Watcher
 import cs6381_constants as constants
-from cs6391_zkclient import ZooClient
+from cs6381_zkclient import ZooClient
 
 
 class Subscriber(object):
@@ -93,7 +93,7 @@ class DirectSubscriber(Subscriber):
         self.socket.setsockopt_string(zmq.SUBSCRIBE, topic)
 
     def start(self, num_pubs, num_subs, num_brokers, num_registries, strategy, topo):
-        print("subscriber starting event loop")
+        print("direct subscriber starting event loop")
         self.poller.register(self.socket, zmq.POLLIN)
         while self.iterations > 0:
             events = dict(self.poller.poll(1000))
@@ -130,7 +130,7 @@ class ViaBrokerSubscriber(Subscriber):
         self.socket.setsockopt_string(zmq.SUBSCRIBE, topic)
 
     def start(self, num_pubs, num_subs, num_brokers, num_registries, strategy, topo):
-        print("subscriber starting event loop")
+        print("broker subscriber starting event loop")
         # cs6381_util.get_output()
         self.poller.register(self.socket, zmq.POLLIN)
         while self.iterations > 0:

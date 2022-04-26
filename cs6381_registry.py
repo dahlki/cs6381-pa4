@@ -12,7 +12,7 @@ from cs6381_zkelection import Election
 from cs6381_registryhelper import RegistryHelper
 from cs6381_util import get_system_address
 from cs6381_zkwatcher import Watcher
-from cs6391_zkclient import ZooClient
+from cs6381_zkclient import ZooClient
 from kad_client import KademliaClient
 
 def parseCmdLineArgs():
@@ -32,7 +32,7 @@ def parseCmdLineArgs():
                         help="Create a new DHT ring, otherwise we join a DHT")
     parser.add_argument("-l", "--debug", default=logging.WARNING, action="store_true",
                         help="Logging level (see logging package): default WARNING else DEBUG")
-    # parser.add_argument("-i", "--ipaddr", type=str, default=None, help="IP address of any existing DHT node")
+    parser.add_argument("-i", "--ipaddr", type=str, default=None, help="IP address of any existing DHT node")
     parser.add_argument("-o", "--port", help="port number used by one or more Kademlia DHT nodes", type=int, default=8468)
     parser.add_argument("-t", "--topo", help="mininet topology; used for data collection info only",
                         choices=["linear", "tree"], type=str)
@@ -45,33 +45,32 @@ class RegistryServer:
     def __init__(self, topo, strategy, pubs=1, subs=1, brokers=1, registries=1, create=False):
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REP)
-        # self.socket_start_notification = self.context.socket(zmq.PUB)
         self.socket_registry_data = self.context.socket(zmq.PUB)
         self.ip = get_system_address()
         self.kad_ipaddr = None
         self.kad_port = None
         self.strategy = strategy
-        self.brokers = brokers if strategy == constants.BROKER else 0
-        self.pubs = pubs
-        self.subs = subs
-        self.registries = registries
-        self.wait = True
-        self.first_node = create
+
         self.debug = False
+        self.first_node = create
         self.create = create
 
         self.kad_client = None
         self.helper = None
-        self.nodes = [self.ip]
+        # self.nodes = [self.ip]
 
         self.lock = threading.Condition()
+
+        self.brokers = brokers if strategy == constants.BROKER else 0
+        self.pubs = pubs
+        self.subs = subs
+        self.registries = registries
         self.topo = topo
 
         self.zoo_client = ZooClient(constants.REGISTRY, self.ip, constants.REGISTRY_PORT_NUMBER)
         self.zoo_client.join_election()
-        self.zoo_client.register_registry(f"{self.ip}:{constants.REGISTRY_PORT_NUMBER}")
+        self.zoo_client.register(constants.KAZOO_REGISTRIES_PATH, f"{self.ip}:{constants.REGISTRY_PORT_NUMBER}")
         self.zk = self.zoo_client.get_zk()
-        self.get_watcher(constants.KAZOO_REGISTRIES_PATH, self.get_registry_ip, True)
 
         self.kad_registries = []
 
@@ -81,16 +80,14 @@ class RegistryServer:
         return watcher
 
     def get_registry_ip(self, path, children):
-        print(f"watcher in registry server - ChildrenWatch: {children}")
-        if children:
-            children_without_self = [child for child in children if self.ip not in child]
-            print(f"children without self: {children_without_self}")
-            # children_without_self = children
-            if children_without_self and not self.create:
-                server_ip = random.choice(children_without_self).split(":")[0]
-                self.kad_ipaddr = server_ip
-            # else:
-            #     self.create = True
+        print(f"registry server - registries ChildrenWatch: {children}")
+        # if children:
+        #     children_without_self = [child for child in children if self.ip not in child]
+        #     # children_without_self = children
+        #     print(f"registries children without self: {children_without_self}")
+        #     if children_without_self:
+        #         server_ip = random.choice(children_without_self).split(":")[0]
+        #         self.kad_ipaddr = server_ip
 
         print("registries children: {}".format(children))
         print("kad_ipaddr: {}".format(self.kad_ipaddr))
@@ -169,7 +166,7 @@ class RegistryServer:
                         sub_nums = self.helper.get(constants.SUB_COUNT)
                         sub_nums = sub_nums if sub_nums is not None else 0
 
-                        print("current pub count: {}".format(sub_nums))
+                        print("current sub count: {}".format(sub_nums))
                         if sub_nums and sub_nums > 0:
                             sub_nums -= 1
                             print("******* updating sub num to {}".format(sub_nums))
@@ -191,6 +188,14 @@ class RegistryServer:
                     self.socket.send_string(json.dumps(registry))
                     print("registry sent")
 
+                elif action == constants.REPLICA:
+                    replica_number, replica_address, data = info
+                    print(f"\n\ngot message for replica!!! {replica_number} {replica_address} {data}")
+                    self.helper.set_value_to_list('primaries', f"{replica_number} {replica_address}")
+                    self.socket.send_string("HI FROM REGISTRY!!!!!!!!!!")
+                    value = self.helper.get("primaries")
+                    print(f"{value}\n\n")
+
     def notify_new_pub_connection(self, topics, connection):
         self.lock.acquire()
         try:
@@ -205,21 +210,9 @@ class RegistryServer:
         finally:
             self.lock.release()
 
-    def start_registry_data(self):
-        self.socket_registry_data.bind('tcp://*:{}'.format(constants.REGISTRY_PUB_PORT_NUMBER))
-        while True:
-            nodes = self.helper.get_registry_nodes()
-            if nodes is not None:
-                for node in nodes:
-                    if not(node in self.nodes):
-                        self.socket_registry_data.send_string("{} {}".format(constants.REGISTRY_NODES, nodes))
-                        self.nodes.append(node)
-            time.sleep(10)
-
     def create_kad_client(self, create, ip, port):
         print(f"KAD: create: {create}, port: {port}, ip: {ip}")
-        bootstrap_node = (ip, int(port))
-        self.kad_client = KademliaClient(create, port, [bootstrap_node], self.debug)
+        self.kad_client = KademliaClient(create, port, [(ip, port)], self.debug)
         self.helper = RegistryHelper(self.kad_client)
 
     def start(self, args):
@@ -229,28 +222,22 @@ class RegistryServer:
         self.first_node = True if self.create else False
         self.debug = args.debug
         self.kad_port = args.port
-        self.kad_ipaddr = self.kad_ipaddr if (self.kad_ipaddr is not None and not self.create) else self.ip
+        self.kad_ipaddr = args.ipaddr if (args.ipaddr is not None and not args.create) else self.ip
 
         # self.socket.bind('tcp://*:{}'.format(constants.REGISTRY_PORT_NUMBER))
 
         registry_thread = threading.Thread(target=self.start_receiving)
         registry_thread.setDaemon(True)
 
-        registry_pub_thread = threading.Thread(target=self.start_registry_data)
-        registry_pub_thread.setDaemon(True)
-
         print(f"registry {self.ip} connecting to kad registry {self.kad_ipaddr}")
         # self.create = args.create if self.create is None else self.create
         self.create_kad_client(self.create, self.kad_ipaddr, self.kad_port)
 
         registry_thread.start()
-        # registry_pub_thread.start()
 
 
 def main():
     args = parseCmdLineArgs()
-    print(f"args {args}")
-    print(f"broker num: {args.brokers}")
     registry = RegistryServer(args.topo, args.disseminate, args.publishers, args.subscribers, args.brokers, args.registries, args.create)
     registry.start(args)
 

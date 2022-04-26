@@ -39,6 +39,7 @@ class KademliaClient:
     # Performs a get against the Kademlia node, storing the result in the
     # resp_future parameter
     async def do_get(self, name, resp_future):
+        await self.kademlia_node.bootstrap(self.kademlia_hosts)
         result = await self.kademlia_node.get(name)
 
         # Store the result in the future, using the future's own event loop
@@ -47,6 +48,7 @@ class KademliaClient:
     # performs a set against the Kademlia node, storing True in the resp_future
     # parameter to indicate success
     async def do_set(self, name, value, resp_future):
+        await self.kademlia_node.bootstrap(self.kademlia_hosts)
         await self.kademlia_node.set(name, value)
 
         # Store True in the resp_future to signal completion
@@ -124,11 +126,9 @@ class KademliaClient:
             # Create a Kademlia node
             self.kademlia_node = Server()
 
-            # if self.create:
                 # Set the port that the node listens on
             await self.kademlia_node.listen(self.kademlia_port)
-            # else:
-            #     print(f"boostrapping: {self.kademlia_hosts}")
+            # if not self.create:
                 # Provide a list of Kademlia hosts to bootstrap against
             await self.kademlia_node.bootstrap(self.kademlia_hosts)
         except Exception as e:
