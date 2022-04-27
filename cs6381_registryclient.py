@@ -228,7 +228,7 @@ class Registry:
         topic = path.replace("/subscriber/", "")
 
         if "sub" not in self.topic_registry:
-            self.topic_registry["pub"] = {}
+            self.topic_registry["sub"] = {}
 
         if data:
             address = data.decode()
@@ -262,7 +262,7 @@ class Registry:
             print("registry response received for register service: %s" % message)
             self.zoo_client.join_election()
             for topic in topics:
-                self.zoo_client.register_topic(topic)
+                self.zoo_client.register_topic("publisher", topic)
                 self.zoo_client.get_watcher(f"/{topic}", None)
 
             if self.strategy == constants.BROKER:
@@ -277,10 +277,11 @@ class Registry:
         print(path, data)
         if data is not None:
             data = data.decode()
-            ip, port = data.split(":")
+            if data:
+                ip, port = data.split(":")
 
-            if constants.KAZOO_BROKER_PATH in path:
-                self.client.connect('tcp://{}:{}'.format(ip, self.port))
+                if constants.KAZOO_BROKER_PATH in path:
+                    self.client.connect('tcp://{}:{}'.format(ip, self.port))
         print(f"{path}-{data}\n")
 
     def register_subscriber(self, topics):
@@ -310,7 +311,7 @@ class Registry:
 
             self.zoo_client.join_election()
             for topic in topics:
-                self.zoo_client.register_topic(topic)
+                self.zoo_client.register_topic("subscriber", topic)
                 self.zoo_client.get_watcher(f"/{topic}", None)
 
             while not registry:

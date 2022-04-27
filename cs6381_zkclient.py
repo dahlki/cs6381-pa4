@@ -79,6 +79,6 @@ class ZooClient:
             print("create node for: {}".format(node_path))
             self.zk.create(node_path, value=address.encode(), makepath=True, ephemeral=True)
 
-    def register_topic(self, topic):
-        topic_election = Election(self.zk, f"publisher/{topic}", self.ip, self.port)
+    def register_topic(self, role, topic):
+        topic_election = Election(self.zk, f"{role}/{topic}", self.ip, self.port)
         topic_election.register()
