@@ -1,6 +1,3 @@
-from kazoo.client import KazooClient
-from kazoo.client import KazooState
-
 import cs6381_constants as constants
 from cs6381_constants import KAZOO_IP, KAZOO_PORT
 from cs6381_zkwatcher import Watcher
@@ -56,21 +53,5 @@ class Election:
 
     def default_callback(self, path, data):
         print(f"in election default callback, path: {path} data: {data}")
-
-    # def load_balancer_election_callback(self, path, data):
-    #     print(f"ELECTION WATCH callback - load_balancer_election_callback, role: {self.role}, path: {path} data: {data}")
-    #     if data is not None:
-    #         self.primary = data.decode()
-    #     print(f"PRIMARY: {self.primary}")
-    #     # if self.zk.exists(self.elected_path):
-    #     #     print(f"elected_path: {self.zk.get(self.elected_path)}")
-    #     if self.zk.exists("/brokers"):
-    #         path = "/brokers"
-    #         brokers = self.zk.get_children(path)
-    #         print(f"brokers path: {brokers}")
-    #         if brokers:
-    #             backup_brokers = [broker for broker in brokers if self.primary not in broker]
-    #             print(f"backup brokers: {backup_brokers}")
-    #
-    #     print("END ELECTION WATCH callback - load_balancer_election_callback\n\n")
+        pass
 

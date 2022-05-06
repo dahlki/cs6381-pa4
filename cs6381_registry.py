@@ -8,6 +8,7 @@ import argparse
 import threading
 import logging
 
+from cs6381_history import History
 from cs6381_zkelection import Election
 from cs6381_registryhelper import RegistryHelper
 from cs6381_util import get_system_address
@@ -45,6 +46,7 @@ class RegistryServer:
     def __init__(self, topo, strategy, pubs=1, subs=1, brokers=1, registries=1, create=False):
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REP)
+        self.cache_socket = self.context.socket(zmq.REP)
         self.socket_registry_data = self.context.socket(zmq.PUB)
         self.ip = get_system_address()
         self.kad_ipaddr = None
@@ -67,17 +69,36 @@ class RegistryServer:
         self.registries = registries
         self.topo = topo
 
+        self.brokers = []
+        self.zk_brokers = []
+
         self.zoo_client = ZooClient(constants.REGISTRY, self.ip, constants.REGISTRY_PORT_NUMBER)
         self.zoo_client.join_election()
         self.zoo_client.register(constants.KAZOO_REGISTRIES_PATH, f"{self.ip}:{constants.REGISTRY_PORT_NUMBER}")
         self.zk = self.zoo_client.get_zk()
-
+        self.get_watcher(constants.KAZOO_BROKERS_PATH, self.brokers_watcher_callback, True)
         self.kad_registries = []
+
+
 
     def get_watcher(self, path, callback, do_watch_children):
         watcher = Watcher(self.zk, constants.REGISTRY, path)
         watcher.watch(callback, do_watch_children)
         return watcher
+
+    def brokers_watcher_callback(self, path, data):
+        print(f"in broker cb in registry: {path} {data}")
+        print(f"registry current broker data: {self.brokers}")
+        self.zk_brokers = data
+        # difference = list(set(current_brokers).difference(data))
+
+    def check_brokers(self):
+        while True:
+            if not(set(self.zk_brokers) == set(self.brokers)):
+                current_brokers = self.helper.get_broker_nodes()
+                self.helper.set_broker_nodes(self.zk_brokers)
+                self.brokers = self.zk_brokers
+                print(f"brokers list!!!!!!!!!!!!!!!!!!!: {self.brokers}")
 
     def get_registry_ip(self, path, children):
         print(f"registry server - registries ChildrenWatch: {children}")
@@ -93,9 +114,7 @@ class RegistryServer:
         print("kad_ipaddr: {}".format(self.kad_ipaddr))
 
     def broker_registration(self, address, port):
-        self.helper.set_broker_ip(address)
-        self.helper.set_broker_port(port)
-        self.socket.send_string("successfully registered broker's address {}!".format(address))
+        self.socket.send_string(json.dumps(self.brokers))
 
     def pub_registration(self, address, port, topics):
         connection = 'tcp://{}:{}'.format(address, port)
@@ -114,14 +133,6 @@ class RegistryServer:
 
     def start_receiving(self):
         self.socket.bind('tcp://*:{}'.format(constants.REGISTRY_PORT_NUMBER))
-
-        if self.first_node:
-            self.helper.set(constants.PUB_COUNT, self.pubs)
-            self.helper.set(constants.SUB_COUNT, self.subs)
-            self.helper.set(constants.BROKER_COUNT, self.brokers)
-            print("setting filedata: {} {} {} {} {}".format(self.topo, self.pubs, self.subs, self.brokers, self.registries))
-            self.helper.set("fileData", "{} {} {} {} {}".format(self.topo, self.pubs, self.subs, self.brokers, self.registries))
-
         print("registry starting to receive requests")
         while True:
             message = self.socket.recv_string(0)
@@ -137,42 +148,19 @@ class RegistryServer:
 
             if message:
                 if action == constants.REGISTER:
-                    role, address, port = info
-                    print("registry request received to {}: {} {} {} {}".format(action, role, address, port, topics))
+                    role, address, port, history = info
+                    print("registry request received to {}: {} {} {} {}".format(action, role, address, port, topics, history))
 
                     if role == constants.BROKER:
                         print("broker registry request received")
                         self.broker_registration(address, port)
 
-                        broker_num = self.helper.get(constants.BROKER_COUNT)
-                        if broker_num and broker_num > 0:
-                            print("******* updating broker num")
-                            self.helper.set(constants.BROKER_COUNT, broker_num - 1)
-
                     if role == constants.PUB:
                         # create pub connection string for topic registration
                         self.pub_registration(address, port, topics)
 
-                        pub_nums = self.helper.get(constants.PUB_COUNT)
-                        pub_nums = pub_nums if pub_nums is not None else 0
-                        print("current pub count: {}".format(pub_nums))
-                        if pub_nums and pub_nums > 0:
-                            pub_nums -= 1
-                            print("******* updating pub num to {}".format(pub_nums))
-                            self.helper.set(constants.PUB_COUNT, pub_nums)
-                        self.socket_registry_data.send_string(constants.PUB_COUNT, pub_nums)
-
                     if role == constants.SUB:
-                        sub_nums = self.helper.get(constants.SUB_COUNT)
-                        sub_nums = sub_nums if sub_nums is not None else 0
-
-                        print("current sub count: {}".format(sub_nums))
-                        if sub_nums and sub_nums > 0:
-                            sub_nums -= 1
-                            print("******* updating sub num to {}".format(sub_nums))
-                            self.helper.set(constants.SUB_COUNT, sub_nums)
-                        meta_data = self.helper.get("fileData")
-                        self.socket.send_string("success {}".format(meta_data))
+                        print("register sub")
 
                 elif action == constants.DISCOVER:
                     topic = info[0]
@@ -195,6 +183,14 @@ class RegistryServer:
                     self.socket.send_string("HI FROM REGISTRY!!!!!!!!!!")
                     value = self.helper.get("primaries")
                     print(f"{value}\n\n")
+                elif action == constants.BROKER:
+                    brokers = self.helper.get_broker_nodes()
+                    broker = brokers.pop()
+                    print(brokers)
+                    print(broker)
+                    print(brokers)
+                    self.helper.set_broker_nodes(brokers)
+                    self.socket.send_string(json.dumps(broker))
 
     def notify_new_pub_connection(self, topics, connection):
         self.lock.acquire()
@@ -210,6 +206,41 @@ class RegistryServer:
         finally:
             self.lock.release()
 
+    def start_cache_service(self):
+        self.cache_socket.bind('tcp://*:{}'.format(constants.CACHE_PORT_NUMBER))
+        while True:
+            message = self.cache_socket.recv_string(0)
+            message = message.split()
+            action, role, address, topic, history = message
+
+            if self.cache_socket.getsockopt(zmq.RCVMORE):
+                message_history = self.cache_socket.recv_json(1)
+            else:
+                message_history = []
+
+            if message:
+                print("\nSSSSSSSSSSSSSSSSSSSSS\n")
+                print(message)
+
+                if action == constants.HISTORY:
+                    if role == constants.SUB:
+                        print(f"in registry getting HISTORY for SUB: {role} {topic} {history} {address}")
+                        history_from_kad = self.helper.get_pub_history(f"{topic}-{history}-{address}")
+                        print(history_from_kad)
+                        if history_from_kad is not None:
+                            self.cache_socket.send_string(history_from_kad)
+                        else:
+                            self.cache_socket.send_string("no history")
+
+                    elif role == constants.PUB:
+                        print(f"in registry setting HISTORY for PUB: {role} {message_history} {topic}")
+                        self.helper.set_pub_history(f"{topic}-{history}-{address}", message_history)
+                        history_from_kad = self.helper.get_pub_history(f"{topic}-{history}-{address}")
+                        # for message in history_from_kad:
+                        #     print(message)
+                        self.cache_socket.send_string("HI FROM REGISTRY!!!!!!!!!!")
+
+
     def create_kad_client(self, create, ip, port):
         print(f"KAD: create: {create}, port: {port}, ip: {ip}")
         self.kad_client = KademliaClient(create, port, [(ip, port)], self.debug)
@@ -224,16 +255,20 @@ class RegistryServer:
         self.kad_port = args.port
         self.kad_ipaddr = args.ipaddr if (args.ipaddr is not None and not args.create) else self.ip
 
-        # self.socket.bind('tcp://*:{}'.format(constants.REGISTRY_PORT_NUMBER))
 
         registry_thread = threading.Thread(target=self.start_receiving)
         registry_thread.setDaemon(True)
 
+        cache_thread = threading.Thread(target=self.start_cache_service)
+        cache_thread.setDaemon(True)
+
         print(f"registry {self.ip} connecting to kad registry {self.kad_ipaddr}")
-        # self.create = args.create if self.create is None else self.create
         self.create_kad_client(self.create, self.kad_ipaddr, self.kad_port)
 
         registry_thread.start()
+        cache_thread.start()
+
+        self.check_brokers()
 
 
 def main():

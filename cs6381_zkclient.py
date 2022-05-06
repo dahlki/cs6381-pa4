@@ -48,7 +48,7 @@ class ZooClient:
         self.election = Election(self.zk, self.role, self.ip, self.port)
         self.election.register()
         self.zk_election = self.election.zk_election
-        return self.zk_election
+        # return self.zk_election
 
     def get_watcher(self, path, callback, watch_children=False):
         try:
@@ -82,3 +82,12 @@ class ZooClient:
     def register_topic(self, role, topic):
         topic_election = Election(self.zk, f"{role}/{topic}", self.ip, self.port)
         topic_election.register()
+        
+    def register_topic_and_history(self, role, topic, history):
+        topic_election = Election(self.zk, f"{topic}/{history}", self.ip, self.port)
+        topic_election.register()
+
+    def join_broker_election(self, replica_num):
+        self.election = Election(self.zk, f"{self.role}_{replica_num}", self.ip, self.port)
+        self.election.register()
+        self.zk_election = self.election.zk_election

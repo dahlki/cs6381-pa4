@@ -90,7 +90,7 @@ def parseCmdLineArgs():
     parser.add_argument("-t", "--time", type=float, default=.05,
                         help="specify seconds between publishing messages; default is 0.05")
     parser.add_argument("-i", "--registryIP", type=str, help="IP address of any existing Registry node")
-    parser.add_argument("-m", "--history", type=int, choices=range(0, 20), default=0, help="max number of history messages; range from 0 - 20; default = 0")
+    parser.add_argument("-m", "--history", type=int, choices=[0, 5, 10, 20, 30], default=0, help="max number of history messages; range from 0 - 20; default = 0")
 
 
     return parser.parse_args()
@@ -115,7 +115,7 @@ async def main():
 
     # get hold of the configurator, which is the factory that produces
     # many kinds of artifacts for us
-    config = Configurator(args, ip)
+    config = Configurator(args, ip, args.history)
 
     # Ask the configurator to gßive us a random subset of topics that we can publish
     my_topics = config.get_interest(args.number)

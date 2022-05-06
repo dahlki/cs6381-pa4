@@ -15,13 +15,9 @@
 # may have to be done here. If dissemination is direct, then each subscriber
 # will have to connect to each separate publisher with whom we match.
 # For the ViaBroker approach, the broker is our only publisher for everything.
-import time
 from abc import abstractmethod
 import zmq
 import cs6381_util
-from cs6381_zkwatcher import Watcher
-import cs6381_constants as constants
-from cs6381_zkclient import ZooClient
 
 
 class Subscriber(object):
@@ -92,13 +88,15 @@ class DirectSubscriber(Subscriber):
         print("DirectSubscriber subscribing to topic: ", topic)
         self.socket.setsockopt_string(zmq.SUBSCRIBE, topic)
 
-    def start(self, num_pubs, num_subs, num_brokers, num_registries, strategy, topo):
+    def start(self, num_pubs=1, num_subs=1, num_brokers=1, num_registries=1, strategy="direct", topo="linear"):
         print("direct subscriber starting event loop")
         self.poller.register(self.socket, zmq.POLLIN)
         while self.iterations > 0:
             events = dict(self.poller.poll(1000))
             if self.socket in events and events[self.socket] == zmq.POLLIN:
                 message = self.socket.recv_string()
+                print("NORMAL")
+                print(message)
                 data = cs6381_util.get_subscribe_message(message, self.address, self.uuid)
                 topic, *value = data
                 if topic in self.topics:
@@ -109,6 +107,12 @@ class DirectSubscriber(Subscriber):
     def stop(self):
         self.socket.disconnect(self.connection)
 
+    def send_history(self, history):
+        for msg in history:
+            print("HISTORY")
+            print(msg)
+            data = cs6381_util.get_subscribe_message(msg, self.address, self.uuid)
+            self.cb(data)
 
 class ViaBrokerSubscriber(Subscriber):
     def __init__(self, address, port, strategy):
@@ -129,7 +133,7 @@ class ViaBrokerSubscriber(Subscriber):
         print("ViaBrokerSubscriber subscribing to topic: ", topic)
         self.socket.setsockopt_string(zmq.SUBSCRIBE, topic)
 
-    def start(self, num_pubs, num_subs, num_brokers, num_registries, strategy, topo):
+    def start(self, num_pubs=1, num_subs=1, num_brokers=1, num_registries=1, strategy="direct", topo="linear"):
         print("broker subscriber starting event loop")
         # cs6381_util.get_output()
         self.poller.register(self.socket, zmq.POLLIN)
@@ -148,3 +152,8 @@ class ViaBrokerSubscriber(Subscriber):
 
     def stop(self):
         self.socket.disconnect(self.connection)
+
+    def send_history(self, history):
+        for msg in history:
+            data = cs6381_util.get_subscribe_message(msg, self.address, self.uuid)
+            self.cb(data)

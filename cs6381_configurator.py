@@ -34,8 +34,10 @@ BYTES = 4096
 class Configurator():
 
     # constructor
-    def __init__(self, args, ip):
+    def __init__(self, args, ip, history=0, broker_num=1):
         self.args = args
+        self.history = history
+        self.broker_num = broker_num
         self.strategy = args.disseminate
         self.ipaddr = ip
         self.port = args.port
@@ -46,7 +48,7 @@ class Configurator():
         # check what our role is. If we are the publisher app, we get the concrete
         # publisher object else get a proxy. The publisher itself may be specialized
         # depending on the dissemination strategy
-        return Publisher(self.ipaddr, self.port, self.strategy).get_publisher_instance(self)
+        return Publisher(self.ipaddr, self.port, self.strategy, self.history).get_publisher_instance(self)
 
     # retrieve the right type of subscriber depending on the cmd line argument
     def get_subscriber(self):
@@ -56,11 +58,11 @@ class Configurator():
         return Subscriber(self.ipaddr, self.port, self.strategy).get_subscriber_instance(self)
 
     # retrieve the right type of broker depending on the cmd line argument
-    def get_broker(self):
+    def get_broker(self, broker_num):
         # check what our role is. If we are the broker, we get the concrete
         # broker object else a proxy. The broker itself may be specialized
         # depending on the dissemination strategy
-        return Broker(self.ipaddr, self.port, self.strategy).get_broker_instance(self)
+        return Broker(self.ipaddr, self.port, self.strategy).get_broker_instance(self, broker_num)
 
     # A publisher and subscriber appln may decide to publish or subscribe to,
     # respectively, a random set of topics. We provide such a helper in the

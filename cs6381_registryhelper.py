@@ -108,3 +108,23 @@ class RegistryHelper:
 
         registry = self.serialize_object(current_registry, topic, connection)
         self.kademlia_client.set("registry", registry)
+
+    def set_broker_nodes(self, new_brokers):
+        self.replace_values_of_list(constants.BROKER_NODES, json.dumps(new_brokers))
+
+    def get_broker_nodes(self):
+        return self.get(constants.BROKER_NODES)
+
+    def replace_values_of_list(self, key, new_list):
+        value_list = self.get_value_list(key)
+        # print("current {} list: {}".format(key, value_list))
+        self.set(key, "")
+        # print("replacing {} list with: {}".format(key, new_list))
+        self.set(key, new_list)
+
+    def set_pub_history(self, topic_history, history):
+        self.replace_values_of_list(topic_history, history)
+
+    def get_pub_history(self, topic_history):
+        return self.get(topic_history)
+

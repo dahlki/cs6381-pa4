@@ -4,10 +4,12 @@ REGISTRY_PUB_PORT_NUMBER = 40001
 BROKER_PORT_NUMBER = 6001
 PUBLISHER_PORT_NUMBER = 5555
 SUBSCRIBER_PORT_NUMBER = 5556
+CACHE_PORT_NUMBER = 6002
 
 REGISTRY = "registry"
 REGISTER = "register"
 DISCOVER = "discover"
+HISTORY = "history"
 
 PUB = "pub"
 SUB = "sub"
@@ -16,6 +18,7 @@ DIRECT = "direct"
 BROKER_IP = "brokerIP"
 BROKER_PORT = "brokerPort"
 REGISTRY_NODES = "registryNodes"
+BROKER_NODES = "brokerNodes"
 
 PUB_COUNT = "pubCount"
 SUB_COUNT = "subCount"

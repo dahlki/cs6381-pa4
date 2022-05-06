@@ -77,7 +77,7 @@ class KademliaClient:
 
     # Performs a Kademlia get
     def get(self, name):
-        # print("in GET", name)
+        print("in GET", name)
 
         # Lock to make sure there is only one pending get or set
         self.kad_lock.acquire()
@@ -140,6 +140,6 @@ class KademliaClient:
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
         if debug:
-            self.logger.setLevel(logging.DEBUG)
+            self.logger.setLevel(logging.NOTSET)
         else:
             self.logger.setLevel(logging.WARNING)

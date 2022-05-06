@@ -45,6 +45,8 @@ def get_publish_message(topic, value, pub_ip, uuid):
 
 # get message received by subscriber and save data in local
 def get_subscribe_message(message, sub_ip, uuid):
+    print(">>>>>>>>>>>>")
+    print(message)
     # get current timestamp (when subscriber receives message)
     current_time = get_timestamp()
 
@@ -56,7 +58,7 @@ def get_subscribe_message(message, sub_ip, uuid):
     # print("{} {} {} {} {}".format(topic, value, pub_id, sub_id, time_difference))
     row = [topic, pub_id, sub_id, time_difference, sent_time, current_time.strftime('%Y-%m-%d %H:%M:%S.%f')]
     data.append(row)
-    print(row)
+    # print(row)
     return [topic, value, pub_id, sub_id, sent_time, current_time.strftime('%Y-%m-%d %H:%M:%S.%f')]
 
 

@@ -13,6 +13,7 @@
 # defined and then two specialized classes. We may need similar things here.
 # I am also assuming that discovery and dissemination are lumped into the
 # broker. Otherwise keep them in separate files.
+import json
 import threading
 
 import zmq
@@ -32,9 +33,9 @@ class Broker(object):
         self.port = port
 
     @staticmethod
-    def get_broker_instance(self):
+    def get_broker_instance(self, broker_num):
         if self.strategy == "broker":
-            return ViaBroker(self.ipaddr, self.port, self.strategy)
+            return ViaBroker(broker_num, self.ipaddr, self.port, self.strategy)
 
     @abstractmethod
     def start(self):
@@ -43,7 +44,7 @@ class Broker(object):
 
 class ViaBroker(Broker):
 
-    def __init__(self, strategy='direct', address='localhost', port=constants.BROKER_PORT_NUMBER):
+    def __init__(self, broker_num, strategy='direct', address='localhost', port=constants.BROKER_PORT_NUMBER):
         super().__init__(strategy, address, port)
         self.context = zmq.Context()
         self.poller = zmq.Poller()
@@ -53,6 +54,19 @@ class ViaBroker(Broker):
         self.xsub = self.context.socket(zmq.XSUB)
 
         self.iterations = None
+        self.broker_num = broker_num
+        self.one = ["weather", "humidity", "airquality"]
+        self.two = ["light", "pressure", "temperature"]
+        self.three = ["sound", "altitude", "location"]
+        self.topics = self.get_topic_list()
+
+    def get_topic_list(self):
+        if self.broker_num == 1:
+            return self.one
+        elif self.broker_num == 2:
+            return self.two
+        else:
+            return self.three
 
     def start(self):
 
@@ -74,17 +88,15 @@ class ViaBroker(Broker):
             event = dict(self.poller.poll())
             if self.xpub in event:
                 msg = self.xpub.recv_multipart()
-                print("from subscription: %r" % msg)
-                self.xsub.send_multipart(msg)
+                for topic in self.topics:
+                    if msg[0] and topic in msg[0].decode():
+                        print("from subscription: %r" % msg)
+                        self.xsub.send_multipart(msg)
             if self.xsub in event:
                 msg = self.xsub.recv_multipart()
-                print("from publisher: %r" % msg)
-
-                decode_msg = msg[0].decode()
-                topic = decode_msg.split(' ')[0]
-                print(topic)
-                # if MetaData().get_topic_address(topic) in decode_msg:
-                print("from publisher: %r" % msg)
-                self.xpub.send_multipart(msg)
+                for topic in self.topics:
+                    if msg[0] and topic in msg[0].decode():
+                        print("from publisher: %r" % msg)
+                        self.xpub.send_multipart(msg)
             if self.iterations:
                 self.iterations -= 1

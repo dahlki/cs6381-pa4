@@ -26,6 +26,7 @@ class TopicList:
     # topiclist = ["weather", "humidity", "airquality", "light",
     #              "pressure", "temperature", "sound", "altitude",
     #              "location"]
+    topiclist = ["weather", "temperature", "sound"]
     topiclist = ["weather"]
 
     # return a random subset of topics from this list, which becomes our interest
