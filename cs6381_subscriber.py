@@ -105,7 +105,9 @@ class DirectSubscriber(Subscriber):
         cs6381_util.write_to_csv(num_pubs, num_subs, num_brokers, num_registries, strategy, topo)
 
     def stop(self):
-        self.socket.disconnect(self.connection)
+        if self.connection:
+            print(f"disconnecting from: {self.connection}")
+            self.socket.disconnect(self.connection)
 
     def send_history(self, history):
         for msg in history:
@@ -151,7 +153,9 @@ class ViaBrokerSubscriber(Subscriber):
         cs6381_util.write_to_csv(num_pubs, num_subs, num_brokers, num_registries, strategy, topo)
 
     def stop(self):
-        self.socket.disconnect(self.connection)
+        if self.connection:
+            print(f"disconnecting from: {self.connection}")
+            self.socket.disconnect(self.connection)
 
     def send_history(self, history):
         for msg in history:

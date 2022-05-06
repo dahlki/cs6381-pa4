@@ -16,10 +16,9 @@ class History:
         else:
             self.history[self.address][topic] = deque(maxlen=history_max)
             self.history[self.address][topic].append(value)
-        # print(self.history)
 
     def get_history(self, pub_address, topic):
-        print(f"getting history of pub {pub_address} for topic {topic}")
+        # print(f"getting history of pub {pub_address} for topic {topic}")
         if self.history.get(pub_address) and self.history.get(pub_address).get(topic):
             return list(self.history.get(pub_address).get(topic))
         else:

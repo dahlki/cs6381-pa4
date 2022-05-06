@@ -62,6 +62,8 @@ class Registry:
 
         self.join_election(replica)
 
+        self.leader_pub = f"{self.address}:{self.port}"
+
     def join_election(self, replica_num):
         print(replica_num)
         if self.role == constants.BROKER:
@@ -190,18 +192,12 @@ class Registry:
 
     def pub_callback(self, path, data):
         print("in pub callback...path: {} - data: {}".format(path, data))
-        # broker_paths = []
-        # for topic in self.topics:
-        #     num = self.get_string_num_from_topic(topic)
-        #     broker_paths.append(f"{constants.KAZOO_BROKER_PATH}_{num}")
-        # print(broker_paths)
-        # print(path in broker_paths)
         if data is not None:
             data = data.decode()
             if ":" in data:
                 ip, port = data.split(":")
-                # if path in broker_paths:
-                if constants.KAZOO_BROKER_PATH in path:
+                print(self.leader_pub == f"{self.address}:{self.port}")
+                if constants.KAZOO_BROKER_PATH in path and (self.leader_pub == f"{self.address}:{self.port}"):
                     self.client.stop()
                     self.client.start(f"{ip}:{self.port}")
                     print(f"pub starting on: {ip}:{self.port}")
@@ -230,6 +226,7 @@ class Registry:
 
                 self.zoo_client.register_topic("publisher", topic)
                 self.zoo_client.get_watcher(f"/{topic}", None)
+                self.zoo_client.get_watcher(f"/{topic}/{self.history}", self.pub_topic_history_watcher_callback)
 
                 if self.strategy == constants.BROKER:
                     print("Watch Broker App!")
@@ -238,8 +235,17 @@ class Registry:
                     # self.zoo_client.get_watcher(constants.KAZOO_BROKER_PATH, self.pub_callback)
                 else:
                     self.client.start()
+
         else:
             print("error - publisher not registered!")
+
+    def pub_topic_history_watcher_callback(self, path, data):
+        print("HELLOOOOOOOOOOOOOOOOOOOOOOOOO")
+        print(path, data)
+        topic, history = path.split("/")[1:]
+        if data:
+            print(topic, history, data)
+            self.leader_pub = data.decode()
 
 # END PUBLISHER #########################################################
 
@@ -280,7 +286,8 @@ class Registry:
                 for history_num in self.history_options:
                     if history_num >= self.history:
                         if str(history_num) in self.history_topic_options[topic] and self.history_topic_options[topic][str(history_num)]:
-                            print("REGISTERING SUB!!!")
+                            # self.client.stop()
+                            print("sending SUB history!!!")
 
                             print(self.history_topic_options)
                             print(self.history_topic_options[topic][str(history_num)])
@@ -297,6 +304,25 @@ class Registry:
                             self.client.connect(f"tcp://{self.history_topic_options[topic][str(history_num)]}")
                             self.client.subscribe(topic)
                             self.client.start()
+                            break
+        else:
+            if self.role == constants.SUB:
+                if topic in self.history_topic_options:
+                    for history_num in self.history_options:
+                        if history_num >= self.history:
+                            if str(history_num) in self.history_topic_options[topic] and self.history_topic_options[topic][str(history_num)]:
+                                print("sending SUB history!!!")
+
+                                cache_thread = threading.Thread(target=self.get_history, args=(
+                                constants.SUB, f"{self.history_topic_options[topic][str(history_num)]}", topic,
+                                self.history))
+                                cache_thread.setDaemon(True)
+                                cache_thread.start()
+                                cache_thread.join()
+                                print(self.message_history)
+                                if self.message_history != "no history":
+                                    self.client.send_history(json.loads(self.message_history))
+                                time.sleep(1)
 
     # SUBCRIBER #########################################################
 

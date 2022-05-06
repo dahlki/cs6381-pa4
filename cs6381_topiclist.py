@@ -26,8 +26,10 @@ class TopicList:
     # topiclist = ["weather", "humidity", "airquality", "light",
     #              "pressure", "temperature", "sound", "altitude",
     #              "location"]
-    topiclist = ["weather", "temperature", "sound"]
     topiclist = ["weather"]
+    # topiclist = ["temperature"]
+    # topiclist = ["sound"]
+    # topiclist = ["weather", "temperature", "sound"]
 
     # return a random subset of topics from this list, which becomes our interest
     # A publisher or subscriber application logic will invoke this method

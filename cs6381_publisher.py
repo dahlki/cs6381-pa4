@@ -128,7 +128,7 @@ class ViaBrokerPublisher(Publisher):
         message = cs6381_util.get_publish_message(topic, value, self.address, self.uuid)
         self.cache.register(self.address, self.history_max, topic, message)
         # self.cache.get_history(self.address, topic)
-        print(message)
+        # print(message)
         self.socket.send_string(message)
 
     def pub_history(self, topic):
